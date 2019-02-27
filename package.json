@@ -1,0 +1,13 @@
+{
+  "name": "mandelbrot-ts",
+  "version": "0.0.1",
+  "description": "mandelbrot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^3.3.3333"
+  }
+}

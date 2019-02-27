@@ -2,6 +2,14 @@
   "compilerOptions": {
     "target": "es5",
     "module": "commonjs",
-    "removeComments": true
-  }
+    "removeComments": true,
+    "outDir": "./www/js",
+    "strict": true
+  },
+  "include": [
+    "www/ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
