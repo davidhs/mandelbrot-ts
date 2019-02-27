@@ -4,12 +4,14 @@
     "module": "commonjs",
     "removeComments": true,
     "outDir": "./www/js",
-    "strict": true
+    "strict": true,
+    "lib": [
+      "webworker", 
+      "es5", 
+      "scripthost",
+      "dom"
+    ]
   },
-  "include": [
-    "www/ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["www/ts/**/*.ts"],
+  "exclude": ["node_modules/**"]
 }
