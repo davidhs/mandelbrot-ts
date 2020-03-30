@@ -1,4 +1,4 @@
-class Qtree {
+export default class Qtree {
   public path: string;
   public children: Array<Qtree>;
   public parent: Qtree | null;

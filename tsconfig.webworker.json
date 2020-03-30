@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "WebWorker",
+      "scripthost",
+      "ESNext"
+    ],
+    "outDir": "./www/js",
+  },
+  "extends": "./tsconfig.json",
+  "include": ["src/webworker/**/*.ts"],
+}

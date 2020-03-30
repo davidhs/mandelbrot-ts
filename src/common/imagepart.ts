@@ -1,4 +1,4 @@
-class ImagePart {
+export default class ImagePart {
   public width: number;
   public height: number;
   public channels: number;

@@ -1,17 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "module": "commonjs",
-    "removeComments": true,
-    "outDir": "./www/js",
+    "module": "ESNext",
     "strict": true,
-    "lib": [
-      "webworker", 
-      "es5", 
-      "scripthost",
-      "dom"
-    ]
+    "noImplicitAny": true,
+    "outDir": "./www/js"
   },
-  "include": ["www/ts/**/*.ts"],
-  "exclude": ["node_modules/**"]
+  "include": ["src"]
 }

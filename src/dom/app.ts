@@ -1,4 +1,11 @@
-class App {
+import Qtree from "../common/qtree.js";
+import ImagePart from "../common/imagepart.js";
+import * as Utils from "../common/utils.js";
+
+const WEB_WORKER_PATH = "js/webworker/worker.js";
+
+
+export default class App {
   public VERBOSE: boolean = false;
 
   public initialized: boolean = false;
@@ -21,13 +28,15 @@ class App {
     origin: { x: number; y: number };
     previous: { x: number; y: number };
   };
+  
+  private canvasNeedsToUpdate: boolean;
 
   constructor() {
     // TypeScript, get off my back!
     this.canvas = <HTMLCanvasElement>document.getElementById("myCanvas");
     this.ctx = <CanvasRenderingContext2D>this.canvas.getContext("2d");
     this.workers = [];
-    this.workerScriptPath = "js/worker.js";
+    this.workerScriptPath = WEB_WORKER_PATH;
     this.defaultNumberOfWorkers = 8;
     this.qtree = new Qtree();
     this.imageParts = [];
@@ -37,6 +46,7 @@ class App {
       1,
       1
     );
+    this.canvasNeedsToUpdate = true;
     this.imageData = this.ctx.getImageData(
       0,
       0,
@@ -99,7 +109,7 @@ class App {
     this.timestamp = App.getTimestamp();
     this.workers = [];
     this.workersAvailability = [];
-    this.workerScriptPath = "js/worker.js";
+    this.workerScriptPath = WEB_WORKER_PATH;
     this.defaultNumberOfWorkers = 8;
 
     this.qtree = new Qtree();
@@ -107,7 +117,7 @@ class App {
     this.setWidth(window.innerWidth);
     this.setHeight(window.innerHeight);
 
-    this.qtree.splitSubTree(3); // 2x2 (4)
+    this.qtree.splitSubTree(4); // 2x2 (4)
 
     let w = Math.ceil(this.getWidth());
     let h = Math.ceil(this.getHeight());
@@ -120,7 +130,7 @@ class App {
     }
 
     for (let i = 0; i < this.defaultNumberOfWorkers; i++) {
-      this.workers[i] = new Worker(this.workerScriptPath);
+      this.workers[i] = new Worker(this.workerScriptPath, { type: "module" });
       this.workersAvailability.push(true);
     }
 
@@ -157,7 +167,6 @@ class App {
       this.mouse.previous.x = x;
       this.mouse.previous.y = y;
 
-      // console.log('mouse down: ' + x + ", " + y);
       this.canvasDown = true;
     });
 
@@ -167,7 +176,7 @@ class App {
       let y = e.clientY - rect.top;
       if (this.canvasDown === true) {
         this.refresh();
-        console.log(this.cfg.scene.point.re + ", " + this.cfg.scene.point.im);
+        // console.log(this.cfg.scene.point.re + ", " + this.cfg.scene.point.im);
 
         let ox = this.mouse.previous.x;
         let oy = this.mouse.previous.y;
@@ -232,8 +241,6 @@ class App {
     });
 
     this.canvas.addEventListener("dblclick", e => {
-      console.log("!");
-
       let rect = this.canvas.getBoundingClientRect();
       let x = e.clientX - rect.left;
       let y = e.clientY - rect.top;
@@ -323,7 +330,7 @@ class App {
           h = Math.floor(h / 2);
           break;
         default:
-          console.log("You fucked up!");
+          throw new Error();
       }
     }
 
@@ -363,30 +370,55 @@ class App {
     this.cfg.height = height;
   }
 
+  /**
+   * I guess any time you make any change, you need to call this function
+   * to rerender.
+   */
   public refresh(): void {
-    this.canvas.width = this.getWidth();
-    this.canvas.height = this.getHeight();
-    // NOTE: this doesn't look super cool.
-    this.ctx = <CanvasRenderingContext2D>this.canvas.getContext("2d");
+    // TODO: handle resize (?)
 
-    for (let i = 0; i < this.imageData.data.length; i += 1) {
-      this.imageDataBuffer.data[i] = this.imageData.data[i];
+    if (this.canvasNeedsToUpdate) {
+      this.canvas.width = this.getWidth();
+      this.canvas.height = this.getHeight();
+
+      this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+
+      this.canvasNeedsToUpdate = false;
+
+      for (let i = 0; i < this.imageData.data.length; i += 1) {
+        this.imageDataBuffer.data[i] = this.imageData.data[i];
+      }
+
+      this.imageData = this.ctx.getImageData(
+        0,
+        0,
+        this.getWidth(),
+        this.getHeight()
+      );
+
+      this.imageData = this.ctx.getImageData(
+        0,
+        0,
+        this.getWidth(),
+        this.getHeight()
+      );
     }
 
-    this.imageData = this.ctx.getImageData(
-      0,
-      0,
-      this.getWidth(),
-      this.getHeight()
-    );
     this.setLatestTimestamp();
     this.updated = true;
 
-    this.ctx.putImageData(this.imageData, 0, 0);
+    // What we're going to do when we need to redraw the canvas
+    {
+      const CHOICE = 1;
+      if (CHOICE === 1) {
+        // Clear the canvas
+        this.ctx.putImageData(this.imageData, 0, 0);
+      } else if (CHOICE === 2) {
+        // Don't clear the canvas
+      }
+    }
 
-    this.qtree.forAll(function(self) {
-      self.flag = false;
-    });
+    this.qtree.forAll(self => { self.flag = false; });
 
     for (let i = 0; i < this.workers.length; i += 1) {
       if (this.workersAvailability[i]) {
@@ -396,9 +428,7 @@ class App {
   }
 
   public start(): void {
-    if (!this.initialized) {
-      this.init();
-    }
+    if (!this.initialized) this.init();
 
     for (let i = 0; i < this.workers.length; i += 1) {
       this.requestJob(i);
@@ -438,7 +468,8 @@ class App {
     }
 
     if (count >= threshold - 1) {
-      console.log("Something is not right");
+      throw new Error("Something is not right");
+      // console.log();
     }
 
     if (!running && !node.flag) {
@@ -456,7 +487,10 @@ class App {
   public workerCallback(e: MessageEvent): void {
     let message = e.data;
 
-    console.log("Receiving part: " + message.part);
+    // TODO: if the data is stale that is being received, maybe discard it
+    // or move it??
+
+    // console.log("Receiving part: " + message.part);
 
     if (this.VERBOSE) {
       console.log("Displaying [" + message.part + "]...");
@@ -536,11 +570,7 @@ class App {
     this.setWidth(window.innerWidth);
     this.setHeight(window.innerHeight);
     this.updated = true;
+    this.canvasNeedsToUpdate = true;
     this.refresh();
   }
 }
-
-(function() {
-  let app = new App();
-  app.start();
-})();

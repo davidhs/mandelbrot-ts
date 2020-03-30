@@ -1,13 +1,16 @@
 {
   "name": "mandelbrot-ts",
   "version": "0.0.1",
-  "description": "mandelbrot",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc"
+    "build": "npm run build:dom && npm run build:webworker && npm run build:common",
+    "build:dom": "tsc -p ./tsconfig.dom.json",
+    "build:common": "tsc -p ./tsconfig.dom.json",
+    "build:webworker": "tsc -p ./tsconfig.webworker.json",
+    "start": "npx ws --port 8000 --hostname 127.0.0.1 --directory www"
   },
   "devDependencies": {
-    "typescript": "^3.3.3333"
+    "typescript": "^3",
+    "local-web-server": "^4"
   }
 }

@@ -1,22 +1,16 @@
 # Mandelbrot (TS)
 
+Works in Google Chrome, but not Firefox since they haven't implemented
+ES Modules for dedicated workers.
+
+## Setup
+
+Run `npm install`, `npm run build` and run `npm run start`.
+
+## Screenshot
+
 ![](res/mandelbrot.png)
 
-## Build
+## References
 
-```sh
-npm install
-npm run build
-```
-
-## NOTE
-
-* TypeScript doesn't like that I use libraries `webworker` and `dom` simulatenously.
-
-## TODO
-
-- [ ] Preview mode
-- [ ] Boundary check
-- [ ] Worker roles, boundary checking workers and quick drawing workers
-- [ ] Stop out-of-date Workers for quick reuse
-- [ ] Enable super sampling
+* [1] <>

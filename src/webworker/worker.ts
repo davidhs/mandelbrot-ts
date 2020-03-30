@@ -1,7 +1,5 @@
-importScripts("utils.js");
-importScripts("imagepart.js");
+import * as Utils from "../common/utils.js";
 
-// FIELDS //
 
 let region: {
   x: number;
@@ -43,7 +41,7 @@ let theta: number;
 let wx0: number;
 let wy0: number;
 
-// RECEIVE MESSAGE //
+
 
 let dataw: number; // data width
 let datah: number; // data height
@@ -74,8 +72,23 @@ onmessage = (e: MessageEvent): void => {
   build2();
 };
 
+/*
+
+        var r, g, b, a;
+        a = 255;
+        for (var i = 0; i < this.size; i++) {
+            var unbounded = this.mdata[i * this.seg.size + this.seg.unbounded];
+            var iterations = this.mdata[i * this.seg.size + this.seg.iterations];
+            var hue = Math.log(iterations);
+            var saturation = 1;
+            var luminance = 0.5 * unbounded;
+            hue = Math.abs(hue) > 1 ? hue % 1 : hue;
+            saturation = Math.abs(saturation) > 1 ? saturation % 1 : saturation;
+            luminance = Math.abs(luminance) > 1 ? luminance % 1 : luminance;
+
+*/
+
 let build2 = (): void => {
-  console.log("Part: " + part + ", worker: " + workerIndex);
   // Loop iterators.
 
   let L = Math.min(cfg.width, cfg.height);
@@ -140,23 +153,59 @@ let build2 = (): void => {
         }
       }
 
-      let nu = il2 * Math.log(Math.log(s1 + s2));
+      if (false) {
+        let nu = il2 * Math.log(Math.log(s1 + s2));
 
-      let cv = Math.log(t + 1 - nu);
+        let cv = Math.log(t + 1 - nu);
+  
+        let hue = cv;
+  
+        hue = 0;
+        let saturation = 1;
+        let luminance = escaped ? 0.5 : 0;
+  
+        luminance = escaped ? 1 - (Math.sin(cv) + 1) / 2 : 0;
+  
+        hue = Math.abs(hue) > 1 ? hue % 1 : hue;
+        saturation = Math.abs(saturation) > 1 ? saturation % 1 : saturation;
+        luminance = Math.abs(luminance) > 1 ? luminance % 1 : luminance;
+  
+        Utils.hslToRgbRW(hue, saturation, luminance, rgb);
+      } else if (false) {
+        // TODO: I don't know what unbounded here means.
+        const unbounded = ESCAPE_THRESHOLD;
+        const iterations = t;
+        let hue = Math.log(iterations);
+        let saturation = 1;
+        let luminance = 0.5 * unbounded;
+        hue = Math.abs(hue) > 1 ? hue % 1 : hue;
+        saturation = Math.abs(saturation) > 1 ? saturation % 1 : saturation;
+        luminance = Math.abs(luminance) > 1 ? luminance % 1 : luminance;
 
-      let hue = cv;
+        Utils.hslToRgbRW(hue, saturation, luminance, rgb);
+      } else if (true) {
+        let nu = il2 * Math.log(Math.log(s1 + s2));
 
-      hue = 0;
-      let saturation = 1;
-      let luminance = escaped ? 0.5 : 0;
+        let cv = Math.log(t + 1 - nu);
+  
+        let hue = cv;
+  
+        // hue = 0;
+        let saturation = 1;
+        let luminance = escaped ? 0.5 : 0;
+  
+        // luminance = escaped ? 1 - (Math.sin(cv) + 1) / 2 : 0;
+  
+        hue = Math.abs(hue) > 1 ? hue % 1 : hue;
+        saturation = Math.abs(saturation) > 1 ? saturation % 1 : saturation;
+        luminance = Math.abs(luminance) > 1 ? luminance % 1 : luminance;
+  
+        Utils.hslToRgbRW(hue, saturation, luminance, rgb);
+      } else {
+        throw new Error("Whoops!");
+      }
 
-      luminance = escaped ? 1 - (Math.sin(cv) + 1) / 2 : 0;
 
-      hue = Math.abs(hue) > 1 ? hue % 1 : hue;
-      saturation = Math.abs(saturation) > 1 ? saturation % 1 : saturation;
-      luminance = Math.abs(luminance) > 1 ? luminance % 1 : luminance;
-
-      Utils.hslToRgbRW(hue, saturation, luminance, rgb);
 
       arr[idx4] = v;
       arr[idx4 + 1] = v;
