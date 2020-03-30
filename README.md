@@ -5,12 +5,15 @@ ES Modules for dedicated workers.
 
 ## Setup
 
-Run `npm install`, `npm run build` and run `npm run start`.
+Run `npm install` to install. 
+
+Either run `npm run build` and `npm run start`, or `npm run dev`.
 
 ## Screenshot
 
-![](res/mandelbrot.png)
+![](screenshot.png)
 
 ## References
 
 * [1] <>
+
