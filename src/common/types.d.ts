@@ -40,8 +40,6 @@ export type Config = {
     sy0: number,
     cos: number,
     sin: number,
-    x2: number,
-    y2: number
   },
 };
 

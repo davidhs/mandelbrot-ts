@@ -104,61 +104,14 @@ export default class App {
         sy0: -1,
         cos: -1,
         sin: -1,
-        x2: -1,
-        y2: -1,
       }
     };
 
     
-
-    // normal..
-    this.init();
-  }
-
-  private precomputeGlobalConfig(): void {
-    const cfg = this.cfg;
-
-    const width = cfg.width;
-    const height = cfg.height;
-
-    const theta = cfg.scene.theta;
-
-    const L = Math.min(cfg.width, cfg.height);
-
-    const z0 = 1 / L;
-    cfg._precomputed.z0 = z0;
-
-    const sx0 = width / 2;
-    cfg._precomputed.sx0 = sx0;
-
-    const sy0 = height / 2;
-    cfg._precomputed.sy0 = sy0;
-
-    const cos = Math.cos(theta);
-    cfg._precomputed.cos = cos;
-
-    const sin = Math.sin(theta);
-    cfg._precomputed.sin = sin;
-  }
-
-  private precomputeLocalConfig(region: Region): void {
-    const cfg = this.cfg;
-
-    const x2 = region.x + region.w;
-    cfg._precomputed.x2 = x2;
-
-    const y2 = region.y + region.h;
-    cfg._precomputed.y2 = y2;
-  }
-
-
-  public init(): void {
     this.VERBOSE = false;
     this.updated = false;
 
     this.initialized = false;
-
-
 
 
     this.timestamp = App.getTimestamp();
@@ -283,10 +236,14 @@ export default class App {
 
       let magnitude = 0.2;
 
+      const toggle = false;
+
+      const sign = toggle ? 1.0 : -1.0;
+
       if (dy > 0) {
-        factor = 1 - magnitude;
+        factor = 1 - sign * magnitude;
       } else {
-        factor = 1 + magnitude;
+        factor = 1 + sign * magnitude;
       }
 
       z *= factor;
@@ -332,7 +289,7 @@ export default class App {
     this.canvas.width = this.getWidth();
     this.canvas.height = this.getHeight();
     // NOTE: this doesn't look super cool.
-    this.ctx = <CanvasRenderingContext2D>this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
 
     this.imageDataBuffer = this.ctx.createImageData(
       this.getWidth(),
@@ -348,13 +305,23 @@ export default class App {
     this.initialized = true;
   }
 
-  public isUpdated(): boolean {
+  private precomputeGlobalConfig() {
+    const cfg = this.cfg;
+
+    const { width, height, scene: { theta } } = cfg;
+
+    cfg._precomputed.z0 = 1.0 / Math.min(width, height);
+    cfg._precomputed.sx0 = width / 2.0;
+    cfg._precomputed.sy0 = height / 2.0;
+    cfg._precomputed.cos = Math.cos(theta);
+    cfg._precomputed.sin = Math.sin(theta);
+  }
+
+  public isUpdated() {
     return this.updated;
   }
 
-  public getRegion(
-    code: string
-  ): { x: number; y: number; w: number; h: number } {
+  public getRegion(code: string) {
     let x = 0;
     let y = 0;
     let w = this.getWidth();
@@ -397,31 +364,31 @@ export default class App {
     };
   }
 
-  public setLatestTimestamp(): void {
+  public setLatestTimestamp() {
     this.timestamp = new Date().getTime();
   }
 
-  public getLatestTimestamp(): number {
+  public getLatestTimestamp() {
     return this.timestamp;
   }
 
-  public static getTimestamp(): number {
+  public static getTimestamp() {
     return new Date().getTime();
   }
 
-  public getWidth(): number {
+  public getWidth() {
     return this.cfg.width;
   }
 
-  public getHeight(): number {
+  public getHeight() {
     return this.cfg.height;
   }
 
-  public setWidth(width: number): void {
+  public setWidth(width: number) {
     this.cfg.width = width;
   }
 
-  public setHeight(height: number): void {
+  public setHeight(height: number) {
     this.cfg.height = height;
   }
 
@@ -429,7 +396,7 @@ export default class App {
    * I guess any time you make any change, you need to call this function
    * to rerender.
    */
-  public refresh(): void {
+  public refresh() {
     // TODO: handle resize (?)
 
     if (this.canvasNeedsToUpdate) {
@@ -482,9 +449,7 @@ export default class App {
     }
   }
 
-  public start(): void {
-    if (!this.initialized) this.init();
-
+  public start() {
     this.precomputeGlobalConfig();
 
     for (let i = 0; i < this.workers.length; i += 1) {
@@ -492,7 +457,7 @@ export default class App {
     }
   }
 
-  public requestJob(workerIndex: number): void {
+  public requestJob(workerIndex: number) {
     // Searches quad tree for a job
 
     let node = this.qtree;
@@ -526,7 +491,6 @@ export default class App {
 
     if (count >= threshold - 1) {
       throw new Error("Something is not right");
-      // console.log();
     }
 
     if (!running && !node.flag) {
@@ -541,13 +505,11 @@ export default class App {
     }
   }
 
-  public workerCallback(e: MessageEvent): void {
+  public workerCallback(e: MessageEvent) {
     let message = e.data;
 
     // TODO: if the data is stale that is being received, maybe discard it
     // or move it??
-
-    // console.log("Receiving part: " + message.part);
 
     if (this.VERBOSE) {
       console.log("Displaying [" + message.part + "]...");
@@ -583,7 +545,7 @@ export default class App {
     this.requestJob(workerIndex);
   }
 
-  public scheduleJob(workerIndex: number, node: Qtree): void {
+  public scheduleJob(workerIndex: number, node: Qtree) {
     let region = this.getRegion(node.path);
     let imagePart = this.imageParts[workerIndex];
 
@@ -600,24 +562,15 @@ export default class App {
       timestamp: this.getLatestTimestamp()
     };
 
-    this.precomputeLocalConfig(region);
-
     let transferList = [message.imagePart.buffer];
     let self = this;
-
-
 
     App.startJob(this.workers[workerIndex], message, transferList, function (e) {
       self.workerCallback(e);
     });
   }
 
-  public static startJob(
-    worker: Worker,
-    message: Object,
-    transferList: Transferable[],
-    callback: (e: MessageEvent) => void
-  ): void {
+  public static startJob(worker: Worker, message: Object, transferList: Transferable[], callback: (e: MessageEvent) => void) {
     // Message is an object with things that will be COPIED (minus those that
     // will be moved)
     // transferList is a list containing things that will be MOVED

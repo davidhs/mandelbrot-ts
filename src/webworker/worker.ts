@@ -28,47 +28,50 @@ onmessage = (e: MessageEvent): void => {
   // Render region of Mandelbrot set //
   /////////////////////////////////////
 
-  let z0 = cfg._precomputed.z0;
+  const z0 = cfg._precomputed.z0;
 
-  let z = zoom;
+  const z = zoom;
 
-  let sx0 = cfg._precomputed.sx0;
+  const sx0 = cfg._precomputed.sx0;
 
-  let sy0 = cfg._precomputed.sy0;
+  const sy0 = cfg._precomputed.sy0;
 
-  let cos = cfg._precomputed.cos;
+  const cos = cfg._precomputed.cos;
 
-  let sin = cfg._precomputed.sin;
+  const sin = cfg._precomputed.sin;
 
   const x1 = region.x;
 
-  const x2 = cfg._precomputed.x2;
+  // TODO: this could be moved into the master thread, since each region is
+  // mostly of equal size, but I'm not 100% sure, so I'm going to leave this
+  // in here.
+  const x2 = region.x + region.w;
 
   const y1 = region.y;
 
-  const y2 = cfg._precomputed.y2;
+  const y2 = region.y + region.h;
 
   
-  let rgb = [0, 0, 0];
+  const rgb = [0, 0, 0];
 
   let idx4 = 0;
 
   for (let y = y1; y < y2; y += 1) {
-    let sdy = y - sy0;
-    let wdy = -z * z0 * sdy;
+    const sdy = y - sy0;
+    const wdy = -z * z0 * sdy;
 
     for (let x = x1; x < x2; x += 1, idx4 += 4) {
-      let sdx = x - sx0;
-      let wdx = z * z0 * sdx;
+      const sdx = x - sx0;
+      const wdx = z * z0 * sdx;
 
-      let wrdx = cos * wdx - sin * wdy;
-      let wrdy = sin * wdx + cos * wdy;
+      const wrdx = cos * wdx - sin * wdy;
+      const wrdy = sin * wdx + cos * wdy;
 
-      let wx = wx0 + wrdx;
-      let wy = wy0 + wrdy;
+      const wx = wx0 + wrdx;
+      const wy = wy0 + wrdy;
 
-      let re0 = wx;
-      let im0 = wy;
+      const re0 = wx;
+      const im0 = wy;
 
       /////////////////////
       // Comoplex number //
@@ -136,9 +139,9 @@ onmessage = (e: MessageEvent): void => {
       //////////////////////////////
 
       if (false) {
-        let nu = INV_NAT_LOG_2 * Math.log(Math.log(s1 + s2));
+        const nu = INV_NAT_LOG_2 * Math.log(Math.log(s1 + s2));
 
-        let cv = Math.log(t + 1 - nu);
+        const cv = Math.log(t + 1 - nu);
 
         let hue = cv;
 
@@ -166,9 +169,9 @@ onmessage = (e: MessageEvent): void => {
 
         Utils.hslToRgbRW(hue, saturation, luminance, rgb);
       } else if (true) {
-        let nu = INV_NAT_LOG_2 * Math.log(Math.log(s1 + s2));
+        const nu = INV_NAT_LOG_2 * Math.log(Math.log(s1 + s2));
 
-        let cv = Math.log(t + 1 - nu);
+        const cv = Math.log(t + 1 - nu);
 
         let hue = cv;
 
