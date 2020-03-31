@@ -2,6 +2,8 @@ import Qtree from "../common/qtree.js";
 import ImagePart from "../common/imagepart.js";
 import * as Utils from "../common/utils.js";
 
+import { Config, MessageFromMasterToSlave, Region } from "../common/types";
+
 const WEB_WORKER_PATH = "js/webworker/worker.js";
 
 
@@ -9,7 +11,7 @@ export default class App {
   public VERBOSE: boolean = false;
 
   public initialized: boolean = false;
-  public cfg: any; // object
+  public cfg: Config; // object
   public workers: Array<Worker>;
   public workerScriptPath: string;
   public defaultNumberOfWorkers: number;
@@ -28,13 +30,13 @@ export default class App {
     origin: { x: number; y: number };
     previous: { x: number; y: number };
   };
-  
+
   private canvasNeedsToUpdate: boolean;
 
   constructor() {
     // TypeScript, get off my back!
-    this.canvas = <HTMLCanvasElement>document.getElementById("myCanvas");
-    this.ctx = <CanvasRenderingContext2D>this.canvas.getContext("2d");
+    this.canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
+    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
     this.workers = [];
     this.workerScriptPath = WEB_WORKER_PATH;
     this.defaultNumberOfWorkers = 8;
@@ -68,15 +70,6 @@ export default class App {
       }
     };
 
-    // normal..
-    this.init();
-  }
-
-  public init(): void {
-    this.VERBOSE = false;
-    this.updated = false;
-
-    this.initialized = false;
     this.cfg = {
       width: 0,
       height: 0,
@@ -104,8 +97,70 @@ export default class App {
             }
           }
         }
+      },
+      _precomputed: {
+        z0: -1,
+        sx0: -1,
+        sy0: -1,
+        cos: -1,
+        sin: -1,
+        x2: -1,
+        y2: -1,
       }
     };
+
+    
+
+    // normal..
+    this.init();
+  }
+
+  private precomputeGlobalConfig(): void {
+    const cfg = this.cfg;
+
+    const width = cfg.width;
+    const height = cfg.height;
+
+    const theta = cfg.scene.theta;
+
+    const L = Math.min(cfg.width, cfg.height);
+
+    const z0 = 1 / L;
+    cfg._precomputed.z0 = z0;
+
+    const sx0 = width / 2;
+    cfg._precomputed.sx0 = sx0;
+
+    const sy0 = height / 2;
+    cfg._precomputed.sy0 = sy0;
+
+    const cos = Math.cos(theta);
+    cfg._precomputed.cos = cos;
+
+    const sin = Math.sin(theta);
+    cfg._precomputed.sin = sin;
+  }
+
+  private precomputeLocalConfig(region: Region): void {
+    const cfg = this.cfg;
+
+    const x2 = region.x + region.w;
+    cfg._precomputed.x2 = x2;
+
+    const y2 = region.y + region.h;
+    cfg._precomputed.y2 = y2;
+  }
+
+
+  public init(): void {
+    this.VERBOSE = false;
+    this.updated = false;
+
+    this.initialized = false;
+
+
+
+
     this.timestamp = App.getTimestamp();
     this.workers = [];
     this.workersAvailability = [];
@@ -138,7 +193,7 @@ export default class App {
 
     window.addEventListener(
       "resize",
-      function() {
+      function () {
         self.resizeCanvas();
       },
       false
@@ -430,6 +485,8 @@ export default class App {
   public start(): void {
     if (!this.initialized) this.init();
 
+    this.precomputeGlobalConfig();
+
     for (let i = 0; i < this.workers.length; i += 1) {
       this.requestJob(i);
     }
@@ -529,7 +586,8 @@ export default class App {
   public scheduleJob(workerIndex: number, node: Qtree): void {
     let region = this.getRegion(node.path);
     let imagePart = this.imageParts[workerIndex];
-    let message = {
+
+    const message: MessageFromMasterToSlave = {
       cfg: this.cfg,
       region: region,
       workerIndex: workerIndex,
@@ -541,10 +599,15 @@ export default class App {
       },
       timestamp: this.getLatestTimestamp()
     };
+
+    this.precomputeLocalConfig(region);
+
     let transferList = [message.imagePart.buffer];
     let self = this;
 
-    App.startJob(this.workers[workerIndex], message, transferList, function(e) {
+
+
+    App.startJob(this.workers[workerIndex], message, transferList, function (e) {
       self.workerCallback(e);
     });
   }
@@ -571,6 +634,7 @@ export default class App {
     this.setHeight(window.innerHeight);
     this.updated = true;
     this.canvasNeedsToUpdate = true;
+    this.precomputeGlobalConfig();
     this.refresh();
   }
 }

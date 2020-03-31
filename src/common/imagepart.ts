@@ -19,15 +19,15 @@ export default class ImagePart {
     this.channels = channels;
   }
 
-  public getSize(): number {
+  public getSize() {
     return this.width * this.height * this.channels;
   }
 
-  public getBuffer(): ArrayBuffer {
+  public getBuffer() {
     return this.arr.buffer;
   }
 
-  public getAdditionalData(): Object {
+  public getAdditionalData() {
     return {
       width: this.width,
       height: this.height,
