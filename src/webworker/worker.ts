@@ -1,5 +1,5 @@
 import * as Utils from "../common/utils.js";
-import { MessageFromMasterToSlave } from "../common/types";
+import { MessageFromMasterToSlave, MessageFromSlaveToMaster } from "../common/types";
 
 
 // Constants
@@ -98,16 +98,16 @@ onmessage = (e: MessageEvent): void => {
         const _p1 = x - ONE_FOURTH;
         const p = Math.sqrt(_p1 * _p1 + y_sq);
 
+        // Check if we're in the cardioid.
         if (x <= p - 2.0 * p * p + ONE_FOURTH) {
-          // We're within the cardioid, do early rejection.
-          t = threshold;
+          t = threshold; // Do early rejection.
         }
 
         const x_inc = x + 1;
 
+        // Check if we're inside period-2 bulb.
         if (x_inc * x_inc + y_sq <= ONE_SIXTEENTH) {
-          // We're inside period-2 bulb, do early rejection.
-          t = threshold;
+          t = threshold; // Do early rejection.
         }
       }
 
@@ -198,11 +198,16 @@ onmessage = (e: MessageEvent): void => {
     }
   }
 
-  const result = {
+  const result: MessageFromSlaveToMaster = {
     part: part,
     imgPart: arr.buffer,
     workerIndex: workerIndex,
-    timestamp: timestamp
+    timestamp: timestamp,
+
+    // Position
+    re: cfg.scene.point.re,
+    im: cfg.scene.point.im,
+    zoom: cfg.scene.zoom,
   };
 
   postMessage(result, [result.imgPart]);

@@ -61,4 +61,13 @@ export type MessageFromMasterToSlave = {
   timestamp: number,
 };
 
-export type MessageFromSlaveToMaster = {};
+export type MessageFromSlaveToMaster = {
+  part: string,
+  imgPart: Uint8ClampedArray["buffer"],
+  workerIndex: number,
+  timestamp: number,
+
+  re: number,
+  im: number,
+  zoom: number,
+};

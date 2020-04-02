@@ -11,7 +11,7 @@
     "dev": " npm run build && npm run start"
   },
   "devDependencies": {
-    "typescript": "^3",
-    "local-web-server": "^4"
+    "typescript": "^3.8.3",
+    "local-web-server": "^4.0.0"
   }
 }

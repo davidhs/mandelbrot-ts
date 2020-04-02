@@ -1,10 +1,10 @@
 export default class Qtree {
-  public path: string;
-  public children: Array<Qtree>;
-  public parent: Qtree | null;
-  public data: Object;
-  public flag: boolean;
-  public splits: number;
+  private path: string;
+  private children: Qtree[];
+  private parent: Qtree | null;
+  private data: Object;
+  private flag: boolean;
+  private splits: number;
 
   constructor(path?: string, parent?: Qtree) {
     this.parent = typeof parent !== "undefined" ? parent : null;
@@ -34,12 +34,19 @@ export default class Qtree {
   public setFlag(flag: boolean): void {
     this.flag = flag;
 
-    if (this.parent) {
+    if (this.parent !== null) {
       this.parent.checkFlagStatus();
     }
   }
 
-  public checkFlagStatus(): void {
+  /**
+   * TODO: maybe implement an iterator for the children?
+   */
+  public getChildren(): Qtree[] {
+    return this.children;
+  }
+
+  private checkFlagStatus(): void {
     let sum = 0;
     if (this.children.length === 4) {
       for (let i = 0; i < this.children.length; i += 1) {
@@ -58,21 +65,41 @@ export default class Qtree {
     }
   }
 
-  public isLeaf(): boolean {
+  public isLeaf() {
     return this.children.length === 0;
   }
 
-  public forAll(func: (self: Qtree) => void): void {
-    func(this);
+  /**
+   * Preorder: do self then children.
+   * 
+   * @param fn 
+   */
+  public forAllPreorder(fn: (self: Qtree) => void): void {
+    fn(this);
 
     if (!this.isLeaf()) {
       for (let i = 0; i < this.children.length; i += 1) {
-        this.children[i].forAll(func);
+        this.children[i].forAllPreorder(fn);
       }
     }
   }
 
-  public splitSelf(): void {
+  /**
+   * Postorder: do children then self.
+   * 
+   * @param fn 
+   */
+  public forPostPreorder(fn: (self: Qtree) => void): void {
+    if (!this.isLeaf()) {
+      for (let i = 0; i < this.children.length; i += 1) {
+        this.children[i].forPostPreorder(fn);
+      }
+    }
+
+    fn(this);
+  }
+
+  private splitSelf(): void {
     if (this.children.length === 0) {
       this.splits += 1;
       for (let i = 0; i < 4; i += 1) {

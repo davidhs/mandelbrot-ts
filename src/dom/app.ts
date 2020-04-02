@@ -1,42 +1,41 @@
 import Qtree from "../common/qtree.js";
 import ImagePart from "../common/imagepart.js";
-import * as Utils from "../common/utils.js";
+import Mouse from "../common/mouse.js";
 
-import { Config, MessageFromMasterToSlave, Region } from "../common/types";
+import { assert, shuffle } from "../common/utils.js";
+
+import { Config, MessageFromMasterToSlave, MessageFromSlaveToMaster } from "../common/types";
 
 const WEB_WORKER_PATH = "js/webworker/worker.js";
 
 
 export default class App {
-  public VERBOSE: boolean = false;
+  private cfg: Config; // object
+  private workers: Array<Worker>;
+  private workerScriptPath: string;
+  private defaultNumberOfWorkers: number;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private qtree: Qtree;
+  private imageParts: Array<ImagePart>;
+  private imageData: ImageData;
+  private imageDataBuffer: ImageData;
+  private updated: boolean;
 
-  public initialized: boolean = false;
-  public cfg: Config; // object
-  public workers: Array<Worker>;
-  public workerScriptPath: string;
-  public defaultNumberOfWorkers: number;
-  public canvas: HTMLCanvasElement;
-  public ctx: CanvasRenderingContext2D;
-  public qtree: Qtree;
-  public imageParts: Array<ImagePart>;
-  public imageData: ImageData;
-  public imageDataBuffer: ImageData;
-  public updated: boolean;
-
-  public workersAvailability: Array<boolean>;
-  public timestamp: number;
-  public canvasDown: boolean;
-  public mouse: {
-    origin: { x: number; y: number };
-    previous: { x: number; y: number };
-  };
+  private workersAvailability: Array<boolean>;
+  private timestamp: number;
+  private mouse: Mouse;
 
   private canvasNeedsToUpdate: boolean;
 
-  constructor() {
+  constructor(canvas: HTMLCanvasElement) {
     // TypeScript, get off my back!
-    this.canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
-    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+    this.canvas = canvas;
+    {
+      const ctx = this.canvas.getContext("2d");
+      assert(ctx !== null);
+      this.ctx = ctx;
+    }
     this.workers = [];
     this.workerScriptPath = WEB_WORKER_PATH;
     this.defaultNumberOfWorkers = 8;
@@ -58,17 +57,8 @@ export default class App {
     this.updated = false;
     this.workersAvailability = [];
     this.timestamp = App.getTimestamp();
-    this.canvasDown = false;
-    this.mouse = {
-      origin: {
-        x: 0,
-        y: 0
-      },
-      previous: {
-        x: 0,
-        y: 0
-      }
-    };
+    
+    this.mouse = new Mouse();
 
     this.cfg = {
       width: 0,
@@ -108,10 +98,7 @@ export default class App {
     };
 
     
-    this.VERBOSE = false;
     this.updated = false;
-
-    this.initialized = false;
 
 
     this.timestamp = App.getTimestamp();
@@ -152,42 +139,25 @@ export default class App {
       false
     );
 
-    this.canvas = <HTMLCanvasElement>document.getElementById("myCanvas");
-    this.canvasDown = false;
-    this.mouse = {
-      origin: {
-        x: 0,
-        y: 0
-      },
-      previous: {
-        x: 0,
-        y: 0
-      }
-    };
 
     this.canvas.addEventListener("mousedown", e => {
-      let rect = this.canvas.getBoundingClientRect();
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
-      this.mouse.origin.x = x;
-      this.mouse.origin.y = y;
-
-      this.mouse.previous.x = x;
-      this.mouse.previous.y = y;
-
-      this.canvasDown = true;
+      this.mouse.consume(e);
     });
 
     this.canvas.addEventListener("mousemove", e => {
-      let rect = this.canvas.getBoundingClientRect();
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
-      if (this.canvasDown === true) {
-        this.refresh();
-        // console.log(this.cfg.scene.point.re + ", " + this.cfg.scene.point.im);
+      this.mouse.consume(e);
 
-        let ox = this.mouse.previous.x;
-        let oy = this.mouse.previous.y;
+      if (this.mouse.mbdr) {
+        this.refresh();
+
+        const x = this.mouse.x;
+        const y = this.mouse.y;
+
+        const px = this.mouse.px;
+        const py = this.mouse.py
+
+        let ox = px;
+        let oy = py;
 
         let L = Math.min(this.cfg.width, this.cfg.height);
         let z0 = 1 / L;
@@ -214,21 +184,17 @@ export default class App {
 
         this.cfg.scene.point.re = wx;
         this.cfg.scene.point.im = wy;
-
-        this.mouse.previous.x = x;
-        this.mouse.previous.y = y;
-
-        // console.log('mouse drag');
       }
     });
 
     this.canvas.addEventListener("mouseup", e => {
-      // console.log('mouse up');
-      this.canvasDown = false;
+      this.mouse.consume(e);
     });
 
     this.canvas.addEventListener("wheel", (e: WheelEvent) => {
-      let dy = e.deltaY;
+      this.mouse.consume(e);
+
+      let dy = this.mouse.wdy;
 
       let z = this.cfg.scene.zoom;
 
@@ -253,6 +219,8 @@ export default class App {
     });
 
     this.canvas.addEventListener("dblclick", e => {
+      this.mouse.consume(e);
+
       let rect = this.canvas.getBoundingClientRect();
       let x = e.clientX - rect.left;
       let y = e.clientY - rect.top;
@@ -302,7 +270,6 @@ export default class App {
       this.getWidth(),
       this.getHeight()
     );
-    this.initialized = true;
   }
 
   private precomputeGlobalConfig() {
@@ -317,11 +284,11 @@ export default class App {
     cfg._precomputed.sin = Math.sin(theta);
   }
 
-  public isUpdated() {
+  private isUpdated() {
     return this.updated;
   }
 
-  public getRegion(code: string) {
+  private getRegion(code: string) {
     let x = 0;
     let y = 0;
     let w = this.getWidth();
@@ -364,31 +331,31 @@ export default class App {
     };
   }
 
-  public setLatestTimestamp() {
+  private setLatestTimestamp() {
     this.timestamp = new Date().getTime();
   }
 
-  public getLatestTimestamp() {
+  private getLatestTimestamp() {
     return this.timestamp;
   }
 
-  public static getTimestamp() {
+  private static getTimestamp() {
     return new Date().getTime();
   }
 
-  public getWidth() {
+  private getWidth() {
     return this.cfg.width;
   }
 
-  public getHeight() {
+  private getHeight() {
     return this.cfg.height;
   }
 
-  public setWidth(width: number) {
+  private setWidth(width: number) {
     this.cfg.width = width;
   }
 
-  public setHeight(height: number) {
+  private setHeight(height: number) {
     this.cfg.height = height;
   }
 
@@ -396,12 +363,15 @@ export default class App {
    * I guess any time you make any change, you need to call this function
    * to rerender.
    */
-  public refresh() {
+  private refresh() {
     // TODO: handle resize (?)
 
     if (this.canvasNeedsToUpdate) {
-      this.canvas.width = this.getWidth();
-      this.canvas.height = this.getHeight();
+      const width = this.getWidth();
+      const height = this.getHeight();
+
+      this.canvas.width = width;
+      this.canvas.height = height;
 
       this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
 
@@ -411,19 +381,8 @@ export default class App {
         this.imageDataBuffer.data[i] = this.imageData.data[i];
       }
 
-      this.imageData = this.ctx.getImageData(
-        0,
-        0,
-        this.getWidth(),
-        this.getHeight()
-      );
-
-      this.imageData = this.ctx.getImageData(
-        0,
-        0,
-        this.getWidth(),
-        this.getHeight()
-      );
+      this.imageData = this.ctx.getImageData(0, 0, width, height );
+      this.imageData = this.ctx.getImageData(0, 0, width, height);
     }
 
     this.setLatestTimestamp();
@@ -440,7 +399,9 @@ export default class App {
       }
     }
 
-    this.qtree.forAll(self => { self.flag = false; });
+    
+
+    this.qtree.forAllPreorder(self => { self.setFlag(false); });
 
     for (let i = 0; i < this.workers.length; i += 1) {
       if (this.workersAvailability[i]) {
@@ -457,7 +418,7 @@ export default class App {
     }
   }
 
-  public requestJob(workerIndex: number) {
+  private requestJob(workerIndex: number) {
     // Searches quad tree for a job
 
     let node = this.qtree;
@@ -470,15 +431,15 @@ export default class App {
     }
 
     while (running && count < threshold) {
-      let n = node.children.length;
+      let n = node.getChildren().length;
       count += 1;
 
       let idxList = [0, 1, 2, 3];
 
-      Utils.shuffle(idxList);
+      shuffle(idxList);
 
       for (let i = 0; i < n; i += 1) {
-        let child = node.children[idxList[i]];
+        let child = node.getChildren()[idxList[i]];
         if (!child.getFlag()) {
           node = child;
           if (child.isLeaf()) {
@@ -493,46 +454,73 @@ export default class App {
       throw new Error("Something is not right");
     }
 
-    if (!running && !node.flag) {
+    if (!running && !node.getFlag()) {
       node.setFlag(true); // claim this region
       this.workersAvailability[workerIndex] = false;
       this.scheduleJob(workerIndex, node);
     } else {
-      if (this.VERBOSE) {
-        console.log("No jobs for you");
-      }
+      // No more jobs for you
       this.updated = false;
     }
   }
 
-  public workerCallback(e: MessageEvent) {
-    let message = e.data;
+  private workerCallback(e: MessageEvent) {
+    const msg: MessageFromSlaveToMaster = e.data;
+
+    // TODO: the data received might be stale since the user might have moved 
+    // the viewport and zoomed in or zoomed out.  Should we try to scale up or
+    // scale down the area and redraw it?
 
     // TODO: if the data is stale that is being received, maybe discard it
     // or move it??
 
-    if (this.VERBOSE) {
-      console.log("Displaying [" + message.part + "]...");
-    }
+    const workerIndex = msg.workerIndex;
 
-    let workerIndex = message.workerIndex;
+    // Mark worker as available.
     this.workersAvailability[workerIndex] = true;
 
-    let arr = new Uint8ClampedArray(message.imgPart);
+    const arr = new Uint8ClampedArray(msg.imgPart);
 
-    let timestamp = message.timestamp;
+    /////////////////////////////
+    // Draw region onto canvas //
+    /////////////////////////////
 
-    if (this.getLatestTimestamp() === timestamp) {
-      let canvasWidth = this.getWidth();
-      let channels = 4;
-      let region = this.getRegion(message.part);
+    // Canvas
+    const c_re = this.cfg.scene.point.re;
+    const c_im = this.cfg.scene.point.im;
+    const c_zoom = this.cfg.scene.zoom;
+
+    // Region
+    const r_re = msg.re;
+    const r_im = msg.im;
+    const r_zoom = msg.zoom;
+
+
+    // TODO: reposition and rescale region.
+
+    if (true || this.getLatestTimestamp() === msg.timestamp) {
+      /** Width of canvas. */
+      const w = this.getWidth();
+      /** How many color channels to iterate through. */
+      const channels = 4;
+
+      const region = this.getRegion(msg.part);
+
 
       for (let y = 0; y < region.h; y += 1) {
         for (let x = 0; x < region.w; x += 1) {
-          let idxCanvas = 4 * (x + region.x + (y + region.y) * canvasWidth);
-          let idxData = 4 * (x + y * region.w);
+          const ic = x + region.x + (y + region.y) * w;
+          const id = x + y * region.w;
+
+          // Multiply for all 4 color channels.
+
+          /* Canvas index */
+          const _ic = 4 * ic;
+          /* Data (region) index */
+          const _id = 4 * id;
+
           for (let ch = 0; ch < channels; ch += 1) {
-            this.imageData.data[idxCanvas + ch] = arr[idxData + ch];
+            this.imageData.data[_ic + ch] = arr[_id + ch];
           }
         }
       }
@@ -545,8 +533,8 @@ export default class App {
     this.requestJob(workerIndex);
   }
 
-  public scheduleJob(workerIndex: number, node: Qtree) {
-    let region = this.getRegion(node.path);
+  private scheduleJob(workerIndex: number, node: Qtree) {
+    let region = this.getRegion(node.getPath());
     let imagePart = this.imageParts[workerIndex];
 
     const message: MessageFromMasterToSlave = {
@@ -570,7 +558,7 @@ export default class App {
     });
   }
 
-  public static startJob(worker: Worker, message: Object, transferList: Transferable[], callback: (e: MessageEvent) => void) {
+  private static startJob(worker: Worker, message: Object, transferList: Transferable[], callback: (e: MessageEvent) => void) {
     // Message is an object with things that will be COPIED (minus those that
     // will be moved)
     // transferList is a list containing things that will be MOVED
@@ -582,7 +570,7 @@ export default class App {
     worker.postMessage(message, transferList);
   }
 
-  public resizeCanvas(): void {
+  private resizeCanvas(): void {
     this.setWidth(window.innerWidth);
     this.setHeight(window.innerHeight);
     this.updated = true;
