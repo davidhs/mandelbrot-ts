@@ -71,7 +71,7 @@ export default class App {
         },
         zoom: 4, // lower value --> zoom in
         rendering: {
-          threshold: 15000,
+          threshold: 150_000,
 
           // Supersampling
           ss: {

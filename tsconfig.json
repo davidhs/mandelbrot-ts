@@ -3,6 +3,9 @@
     "module": "ESNext",
     "strict": true,
     "noImplicitAny": true,
+    "lib": [
+      "ESNext"
+    ],
     "outDir": "./www/js"
   },
   "include": ["src"]

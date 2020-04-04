@@ -3,11 +3,7 @@ import { MessageFromMasterToSlave, MessageFromSlaveToMaster } from "../common/ty
 
 
 // Constants
-// const BAILOUT_RADIUS = 2147483647;
-const BAILOUT_RADIUS = 65536;
-
-
-
+const BAILOUT_RADIUS = 2147483647;
 
 
 // Coloring method
@@ -18,23 +14,9 @@ const THEME_FIRE = 12;
 
 const THEME: number = THEME_RAINBOW;
 
-/**
- * Fractual equivalence given tolerance
- * 
- * @param a 
- * @param b 
- * @param t 
- */
-function feq(a: number, b: number, t: number) {
-  let d = a - b;
-  if (d < 0) d = -d;
-  return d <= t;
-}
 
-
-
-
-function * processMaker(msg: MessageFromMasterToSlave): Generator<boolean, boolean, boolean> {
+onmessage = (e: MessageEvent): void => {
+  const msg: MessageFromMasterToSlave = e.data;
 
   const cfg = msg.cfg;
   const region = msg.region;
@@ -72,9 +54,6 @@ function * processMaker(msg: MessageFromMasterToSlave): Generator<boolean, boole
   const rgb = [0, 0, 0];
 
   let idx4 = 0;
-
-  let pixelCount = 0;
-  const pixelCountYield = 100;
 
   for (let y = y1; y < y2; y += 1) {
     const sdy = y - sy0;
@@ -140,56 +119,23 @@ function * processMaker(msg: MessageFromMasterToSlave): Generator<boolean, boole
       /** im * im */
       let im_sq = im * im;
 
-      // periodicity checking
-
-      let re_old = 0;
-      let im_old = 0;
-      let period = 0;
-      const period_limit = 100;
+      /** 
+       * A boolean whether we escaped, i.e. verified we're not part of the
+       * mandelbrot set.
+       */
+      let escaped = false;
 
       // Implementation of an optimized escape time algorithm.
-      while (re_sq + im_sq <= BAILOUT_RADIUS && iteration < max_iteration) {
+
+      for (; iteration < max_iteration && !escaped; iteration += 1, escaped = re_sq + im_sq > BAILOUT_RADIUS) {
         im = 2 * re * im + im0;
         re = re_sq - im_sq + re0;
 
         re_sq = re * re;
         im_sq = im * im;
-
-        iteration += 1
-
-        const feq_t = 0.000001;
-
-        if (feq(re, re_old, feq_t) && feq(im, im_old, feq_t)) {
-          // We're inside the Mandelbrot set
-          iteration = max_iteration;
-          break;
-        }
-
-        period += 1;
-        if (period > period_limit) {
-          period = 0;
-
-          re_old = re;
-          im_old = im;
-        }
       }
 
-      /** 
-       * A boolean whether we escaped, i.e. verified we're not part of the
-       * mandelbrot set.
-       */
-      const escaped = iteration < max_iteration;
-
-
-      // To avoid floating point issues with points inside the set?
-      /*
-      if (iteration < max_iteration) {
-        const nu = Math.log2(Math.log2(re_sq + im_sq)) - 1.0;
-
-        iteration = iteration + 1 - nu;
-      }
-      */
-
+      
 
       //////////////////////////////
       // Determine color of pixel //
@@ -228,10 +174,6 @@ function * processMaker(msg: MessageFromMasterToSlave): Generator<boolean, boole
 
         Utils.hslToRgbRW(hue, saturation, luminance, rgb);
       } else if (THEME === THEME_RAINBOW) {
-
-
-
-
         const nu = Math.log2(Math.log2(re_sq + im_sq)) - 1.0;
 
         const cv = Math.log(iteration + 1 - nu);
@@ -258,13 +200,6 @@ function * processMaker(msg: MessageFromMasterToSlave): Generator<boolean, boole
       arr[idx4 + 1] = rgb[1];
       arr[idx4 + 2] = rgb[2];
       arr[idx4 + 3] = 255;
-
-
-      pixelCount += 1;
-
-      if (pixelCount % pixelCountYield === 0) {
-        yield true;
-      }
     }
   }
 
@@ -280,38 +215,5 @@ function * processMaker(msg: MessageFromMasterToSlave): Generator<boolean, boole
     zoom: cfg.scene.zoom,
   };
 
-  
-  output(result);
-
-  return false;
+  postMessage(result, [result.imgPart]);
 };
-
-
-
-
-
-
-
-
-
-
-function input(msg: MessageFromMasterToSlave) {
-
-  const process = processMaker(msg);
-
-  while (process.next().value) {}
-}
-
-
-function output(msg: MessageFromSlaveToMaster) {
-  // @ts-ignore
-  postMessage(msg, [msg.imgPart]);
-}
-
-
-// @ts-ignore
-onmessage = (e: MessageEvent): void => {
-  const msg: MessageFromMasterToSlave = e.data;
-
-  input(msg);
-}

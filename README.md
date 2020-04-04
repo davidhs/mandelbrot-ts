@@ -11,9 +11,4 @@ Either run `npm run build` and `npm run start`, or `npm run dev`.
 
 ## Screenshot
 
-![](screenshot.png)
-
-## References
-
-* [1] <>
-
+![](misc/screenshot.png)
