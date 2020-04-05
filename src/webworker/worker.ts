@@ -60,6 +60,7 @@ function* edgePixels(region: Region): IterableIterator<[number, number]> {
   }
 }
 
+// It appears generators are MUCH slower :'(
 function* pixelsRegion(cfg: Config, region: Region): IterableIterator<{ re: number, im: number, idx: number }> {
   const { cw, ch, z } = cfg;
 
@@ -93,15 +94,15 @@ function* pixelsRegion(cfg: Config, region: Region): IterableIterator<{ re: numb
 
 
 
-function* processMaker(inMsg: MFMTS_Work): Generator<boolean, boolean, boolean> {
+function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, boolean> {
 
   // Constants
   // const BAILOUT_RADIUS = 2147483647;
   const bailout_radius = 2 ** 20;
 
-  const { cfg, region, part } = inMsg;
+  const { cfg, region, part } = input_message;
 
-  arr = new Uint8ClampedArray(inMsg.imagePart.buffer);  // data
+  arr = new Uint8ClampedArray(input_message.imagePart.buffer);  // data
 
 
   /** What is the max. iteration we're willing to tolerate. */
@@ -137,14 +138,14 @@ function* processMaker(inMsg: MFMTS_Work): Generator<boolean, boolean, boolean> 
 
   // TODO: maybe put the count limit such that it's proportional to region
   // size?
-  let pixelCount = 0;
-  const pixelCountYield = 2000;
+  let pixel_count = 0;
+  const pixel_count_yield = 2000;
 
   for (const { re: re0, im: im0, idx: idx4 } of pixelsRegion(cfg, region)) {
 
-    pixelCount += 1;
+    pixel_count += 1;
 
-    if (pixelCount % pixelCountYield === 0) {
+    if (pixel_count % pixel_count_yield === 0) {
       yield true;
     }
 
@@ -241,20 +242,26 @@ function* processMaker(inMsg: MFMTS_Work): Generator<boolean, boolean, boolean> 
 
     Palette.softrainbow(escaped, iterations, rgba);
 
-    arr[idx4 + 0] = clamp(Math.floor(256 * rgba[0]), 0, 255);
-    arr[idx4 + 1] = clamp(Math.floor(256 * rgba[1]), 0, 255);
-    arr[idx4 + 2] = clamp(Math.floor(256 * rgba[2]), 0, 255);
-    arr[idx4 + 3] = clamp(Math.floor(256 * rgba[3]), 0, 255);
+    for (let i = 0; i < 4; i += 1) {
+      const co = 256 * rgba[i];
+      const ci = Math.floor(co);
+      const cf = co - ci;
+
+      // Apply dithering
+      const c = ci + ((Math.random() < cf) ? 1 : 0);
+
+      arr[idx4 + i] = clamp(c, 0, 255);
+    }
   }
 
 
   const outMsg: MessageFromSlaveToMaster = {
-    id: inMsg.cfg.id,
+    id: input_message.cfg.id,
 
     done: true,
     part: part,
     imgPart: arr.buffer,
-    wi: inMsg.wi,
+    wi: input_message.wi,
 
     re: cfg.re,
     im: cfg.im,
@@ -287,7 +294,7 @@ function doWork(inMsg: MFMTS_Work) {
 
     const { cfg, part } = inMsg;
 
-    const outMsg: MessageFromSlaveToMaster = {      
+    const output_message: MessageFromSlaveToMaster = {      
       id: inMsg.cfg.id,
 
       done: false,
@@ -301,7 +308,7 @@ function doWork(inMsg: MFMTS_Work) {
       z: cfg.z,
     };
 
-    postMessage(outMsg, [outMsg.imgPart]);
+    postMessage(output_message, [output_message.imgPart]);
   }
 }
 
@@ -313,11 +320,11 @@ function doStop() {
 
 
 function messageHandler(e: MessageEvent): void {
-  const inMsg: MessageFromMasterToSlave = e.data;
+  const input_message: MessageFromMasterToSlave = e.data;
 
-  if (inMsg.type === "work") {
-    doWork(inMsg);
-  } else if (inMsg.type === "stop") {
+  if (input_message.type === "work") {
+    doWork(input_message);
+  } else if (input_message.type === "stop") {
     doStop();
   }
 }
