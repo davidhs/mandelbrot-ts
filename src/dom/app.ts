@@ -31,6 +31,9 @@ export default class App {
 
   private canvasNeedsToUpdate: boolean;
 
+  #old_z: number;
+  #new_z: number;
+
   constructor(canvas: HTMLCanvasElement) {
 
 
@@ -47,6 +50,9 @@ export default class App {
       z: 4,
       max_iter: 15000,
     };
+
+    this.#old_z = cfg.z;
+    this.#new_z = cfg.z;
 
     const qtree = new Qtree();
     const imageParts: ImagePart[] = [];
@@ -152,6 +158,8 @@ export default class App {
 
       let z = this.cfg.z;
 
+      this.#old_z = z;;
+
       let factor = 1;
 
       let magnitude = 0.2;
@@ -169,6 +177,8 @@ export default class App {
       z *= factor;
 
       this.cfg.z = z;
+
+      this.#new_z = z;
 
       this.refresh();
     });
@@ -283,33 +293,49 @@ export default class App {
 
     // Translate | scale image
 
-    const dx = this.mouse.cx - this.mouse.px;
-    const dy = this.mouse.cy - this.mouse.py;
+    const pan_x = this.mouse.cx - this.mouse.px;
+    const pan_y = this.mouse.cy - this.mouse.py;
 
     // What we're going to do when we need to redraw the canvas
     // this.ctx.putImageData();
 
-    
     const cw = this.cfg.cw;
     const ch = this.cfg.ch;
 
-    this.ctx.drawImage(this.canvas, dx, dy);
+    const old_z = this.#old_z;
+    const new_z = this.#new_z;
+
+    const sx = 0;
+    const sy = 0;
+    const sw = cw;
+    const sh = ch;
+
+
+    const f = old_z / new_z; //new_z / old_z;
+    
+    const dw = f * cw;
+    const dh = f * ch;
+
+    const dx = pan_x + (cw - dw) / 2;
+    const dy = pan_y + (ch - dh) / 2;
+    
+    this.ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+
+    // Eat this
+    this.#old_z = this.#new_z;
+
     this.imageData = this.ctx.getImageData(0, 0, cw, ch);
+
+    
+
 
     // @ts-ignore
     if (!window.DEBUG_1) {
       this.cfg.id = Date.now();
-
-
-      // Invalidate work
       this.stopCurrentWork();
-  
       this.qtree.free();
-  
       this.makeAllAvailableWorkersWork();
     }
-
-
   }
 
   public makeAllAvailableWorkersWork() {
