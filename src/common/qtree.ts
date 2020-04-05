@@ -96,7 +96,6 @@ export default class Qtree {
     return this.#children;
   }
 
-
   public isLeaf() {
     return this.#children.length === 0;
   }

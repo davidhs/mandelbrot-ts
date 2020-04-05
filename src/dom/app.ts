@@ -4,15 +4,11 @@
 import Qtree from "../common/qtree.js";
 import ImagePart from "../common/imagepart.js";
 import Mouse from "../common/mouse.js";
-
 import { assert } from "../common/utils.js";
-
 import { Config, MessageFromMasterToSlave, MessageFromSlaveToMaster, Region } from "../common/types";
 
 const WEB_WORKER_PATH = "js/webworker/worker.js";
-
 const DEFAULT_NUMBER_OF_WORKS = 8;
-
 
 
 export default class App {
@@ -24,18 +20,13 @@ export default class App {
   private imageParts: Array<ImagePart>;
   private imageData: ImageData;
   private imageDataBuffer: ImageData;
-
-
   private isWorkerAvailable: Array<boolean>;
   private mouse: Mouse;
-
   private canvasNeedsToUpdate: boolean;
-
   #dx: number;
   #dy: number;
   #dw: number;
   #dh: number;
-
   #back_canvas: HTMLCanvasElement;
   #back_ctx: CanvasRenderingContext2D;
 
@@ -119,7 +110,6 @@ export default class App {
       cfg.cw,
       cfg.ch
     );
-
 
     window.addEventListener("resize", () => { this.resizeCanvas() }, false);
 
@@ -232,7 +222,6 @@ export default class App {
       const ch = this.cfg.ch;
 
       const f = old_zoom / new_zoom;
-
       
       const dw = f * cw;
       const dh = f * ch;
@@ -255,7 +244,6 @@ export default class App {
       this.cfg.im = im_new;
 
       this.refresh();
-
 
       e.preventDefault();
     });
@@ -328,7 +316,6 @@ export default class App {
 
   private mandelbrotToCanvas(re: number, im: number) {
     // TODO: I'm not 100% sure this code works correctly.
-
     const canvas_x_old = this.mouse.cx;
     const canvas_y_old = this.mouse.cy;
 
@@ -345,7 +332,6 @@ export default class App {
 
     return [canvas_x_new, canvas_y_new];
   }
-
 
   private getRegion(code: string): Region {
     let x = 0;
@@ -448,7 +434,6 @@ export default class App {
     this.qtree.free();
     this.makeAllAvailableWorkersWork();
   }
-
 
   /**
    * I guess any time you make any change, you need to call this function

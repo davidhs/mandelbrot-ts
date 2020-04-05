@@ -45,7 +45,6 @@ export type MFMTS_Stop = {
   type: "stop";
 }
 
-
 export type MessageFromMasterToSlave = MFMTS_Work | MFMTS_Stop;
 
 export type MessageFromSlaveToMaster = {

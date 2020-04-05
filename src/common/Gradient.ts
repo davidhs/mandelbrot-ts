@@ -111,7 +111,8 @@ export default class Gradient {
       } else if (p <= p2) {
         p += 1.0 - p1;
       } else {
-        throw new Error(``);
+        // TODO: might fail because of floating-point numbers
+        throw new Error(`Error: p = ${p}: expected p >= ${p1} OR p <= ${p2}`);
       }
 
       const span = 1.0 - (p1 - p2);

@@ -1,11 +1,7 @@
 import Gradient from "./Gradient.js";
 import { hslToRgbRW, hex2rgba } from "./utils.js";
 
-
-
 type PaletteFunction = (escaped: boolean, iterations: number, rgba: number[]) => void;
-
-
 
 export const rainbow: PaletteFunction = (escaped: boolean, iterations: number, rgba: number[]) => {
   let hue = Math.log2(Math.abs(iterations));
@@ -38,7 +34,6 @@ export const fire: PaletteFunction = (escaped: boolean, iterations: number, rgba
   const cv = Math.log2(Math.abs(iterations));
 
   const luminance = 1 - (Math.sin(cv) + 1) / 2;
-
   const hue = 0.0;
   const saturation = 1.0;
 
@@ -72,9 +67,6 @@ export const redBlue: PaletteFunction = (() => {
 
   return palette;
 })();
-
-
-
 
 export const unnamed1: PaletteFunction = (() => {
   const gradient = new Gradient();
@@ -125,9 +117,6 @@ export const softrainbow: PaletteFunction = (() => {
   };
 })();
 
-
-
-
 export const wiki: PaletteFunction = (() => {
   const gradient = new Gradient();
   gradient.setPositionColor(0.0000, [0 / 255, 7 / 255, 100 / 255]);
@@ -153,16 +142,8 @@ export const wiki: PaletteFunction = (() => {
   return palette;
 })();
 
-
 export const fire2: PaletteFunction = (() => {
   const gradient = new Gradient();
-
-  // #ffd400 0%,
-  // #ff7716 21%,
-  // #e00b0b 43%,
-  // #840e0e 66%,
-
-  // #000000 87%
 
   gradient.setPositionColor(0.00, hex2rgba("#ffd400"));
   gradient.setPositionColor(0.21, hex2rgba("#ff7716"));

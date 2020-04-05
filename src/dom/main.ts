@@ -1,7 +1,6 @@
 import App from "./app.js";
 import { assert } from "../common/utils.js";
 
-
 async function main() {
   // TODO: maybe wait for window to load?
   
@@ -14,7 +13,7 @@ async function main() {
     canvas = element;
   }
   
-  const app = new App(canvas);
+  new App(canvas);
 }
 
 main();

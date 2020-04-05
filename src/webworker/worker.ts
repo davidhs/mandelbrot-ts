@@ -2,10 +2,7 @@
 /// <reference lib="webworker" />
 
 import { clamp, feq } from "../common/utils.js";
-
 import { MessageFromMasterToSlave, MessageFromSlaveToMaster, Region, Config, MFMTS_Work } from "../common/types";
-
-
 import * as Palette from "../common/palettes.js";
 
 
@@ -16,7 +13,6 @@ let arr: Uint8ClampedArray;
 
 function* edgePixels(region: Region): IterableIterator<[number, number]> {
   // Edge checking
-
   const { x, y, w, h } = region;
 
   const x1 = x;
@@ -60,7 +56,12 @@ function* edgePixels(region: Region): IterableIterator<[number, number]> {
   }
 }
 
-// It appears generators are MUCH slower :'(
+/**
+ * NOTE: appears to be much slow than to implement it without a generator.
+ * 
+ * @param cfg 
+ * @param region 
+ */
 function* pixelsRegion(cfg: Config, region: Region): IterableIterator<{ re: number, im: number, idx: number }> {
   const { cw, ch, z } = cfg;
 
@@ -89,13 +90,11 @@ function* pixelsRegion(cfg: Config, region: Region): IterableIterator<{ re: numb
   }
 }
 
-
-
-
-
-
+/**
+ * 
+ * @param input_message 
+ */
 function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, boolean> {
-
   // Constants
   // const BAILOUT_RADIUS = 2147483647;
   const bailout_radius = 2 ** 20;
@@ -103,7 +102,6 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
   const { cfg, region, part } = input_message;
 
   arr = new Uint8ClampedArray(input_message.imagePart.buffer);  // data
-
 
   /** What is the max. iteration we're willing to tolerate. */
   const max_iterations = cfg.max_iter;
@@ -121,7 +119,6 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
 
   }
 
-
   // Border checking
   {
 
@@ -132,9 +129,7 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
 
   }
 
-
   // Color rest
-
 
   // TODO: maybe put the count limit such that it's proportional to region
   // size?
@@ -184,11 +179,8 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
     // Check if we're in the Mandelbrot set //
     //////////////////////////////////////////
 
-    /** re * re */
     let re_sq = re * re;
-    /** im * im */
     let im_sq = im * im;
-
 
     let re_old = 0;
     let im_old = 0;
@@ -254,7 +246,6 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
     }
   }
 
-
   const output_message: MessageFromSlaveToMaster = {
     id: input_message.cfg.id,
 
@@ -269,12 +260,10 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
     z: cfg.z,
   };
 
-
   postMessage(output_message, [output_message.imgPart]);
 
   return false;
 };
-
 
 function doWork(inMsg: MFMTS_Work) {
   const process = processMaker(inMsg);
@@ -294,7 +283,7 @@ function doWork(inMsg: MFMTS_Work) {
 
     const { cfg, part } = inMsg;
 
-    const output_message: MessageFromSlaveToMaster = {      
+    const output_message: MessageFromSlaveToMaster = {
       id: inMsg.cfg.id,
 
       done: false,

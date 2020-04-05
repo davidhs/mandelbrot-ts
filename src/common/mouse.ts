@@ -1,7 +1,5 @@
 import { assert } from "./utils.js";
 
-
-
 function getMousePosition(canvas: HTMLCanvasElement, e: MouseEvent) {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -11,7 +9,6 @@ function getMousePosition(canvas: HTMLCanvasElement, e: MouseEvent) {
 }
 
 export default class Mouse {
-
   // Current x
   public x: number;
   public y: number;
@@ -135,4 +132,3 @@ export default class Mouse {
     }
   }
 }
-
