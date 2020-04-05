@@ -5,7 +5,7 @@ import Qtree from "../common/qtree.js";
 import ImagePart from "../common/imagepart.js";
 import Mouse from "../common/mouse.js";
 
-import { assert, ditherToInt } from "../common/utils.js";
+import { assert } from "../common/utils.js";
 
 import { Config, MessageFromMasterToSlave, MessageFromSlaveToMaster, Region } from "../common/types";
 
@@ -13,23 +13,6 @@ const WEB_WORKER_PATH = "js/webworker/worker.js";
 
 const DEFAULT_NUMBER_OF_WORKS = 8;
 
-
-/**
- * Source: https://gist.github.com/ca0v/73a31f57b397606c9813472f7493a940
- * 
- * @param cb 
- * @param wait 
- */
-function debounce<T extends Function>(cb: T, wait: number) {
-  let h = 0;
-  
-  let callable = (...args: any) => {
-      clearTimeout(h);
-      h = setTimeout(() => cb(...args), wait);
-  };
-
-  return <T>(<any>callable);
-}
 
 
 export default class App {
@@ -48,16 +31,13 @@ export default class App {
 
   private canvasNeedsToUpdate: boolean;
 
-  #old_z: number;
-  #new_z: number;
-
   #dx: number;
   #dy: number;
   #dw: number;
   #dh: number;
 
-  private debouncedRefresh: any;
-
+  #back_canvas: HTMLCanvasElement;
+  #back_ctx: CanvasRenderingContext2D;
 
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
@@ -71,11 +51,13 @@ export default class App {
       re: -0.5,
       im: +0.0,
       z: 4,
-      max_iter: 15000,
+      max_iter: 30000,
     };
 
-    this.#old_z = cfg.z;
-    this.#new_z = cfg.z;
+    this.#back_canvas = document.createElement("canvas");
+    const back_ctx = this.#back_canvas.getContext("2d");
+    assert(back_ctx !== null);
+    this.#back_ctx = back_ctx;
 
     const qtree = new Qtree();
     const imageParts: ImagePart[] = [];
@@ -205,17 +187,12 @@ export default class App {
 
       const old_zoom = this.cfg.z;
 
-      this.#old_z = old_zoom;
-
       const magnitude = 0.2;
       const sign = this.mouse.wdy > 0 ? -1.0 : 1.0;
 
       const factor = 1 - sign * magnitude;
 
       const new_zoom = old_zoom * factor;
-
-
-      this.#new_z = new_zoom;
 
       // -----------------------------------------------------------------------
       // Move
@@ -296,10 +273,6 @@ export default class App {
 
       this.refresh();
     });
-
-    this.debouncedRefresh = debounce(() => {
-      this._doRefresh();
-    }, 1);
 
     this.refresh();
   }
@@ -441,15 +414,31 @@ export default class App {
       }
 
       this.imageData = this.ctx.getImageData(0, 0, cw, ch);
+
+      this.#back_canvas.width = cw;
+      this.#back_canvas.height = ch;
+
+      const back_ctx = this.#back_canvas.getContext("2d");
+      assert(back_ctx !== null);
+      this.#back_ctx = back_ctx;
     }
 
     // Move and scale the previous image
 
-    this.ctx.drawImage(
+    this.#back_ctx.clearRect(0, 0, cw, ch);
+
+    // Draw to back canvas
+    this.#back_ctx.drawImage(
       this.canvas, 
       0, 0, cw, ch, 
       this.#dx, this.#dy, this.#dw, this.#dh
     );
+
+    // Clear front canvas
+    this.ctx.clearRect(0, 0, cw, ch);
+
+    // Draw from back canvas to front canvas.
+    this.ctx.drawImage(this.#back_canvas, 0, 0);
 
     this.imageData = this.ctx.getImageData(0, 0, cw, ch);
     // this.ctx.putImageData(this.imageData, 0, 0);
