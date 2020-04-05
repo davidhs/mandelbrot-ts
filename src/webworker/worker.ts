@@ -3,12 +3,15 @@
 
 import { clamp, feq } from "../common/utils.js";
 
-import { MessageFromMasterToSlave, MessageFromSlaveToMaster, Region, Config } from "../common/types";
+import { MessageFromMasterToSlave, MessageFromSlaveToMaster, Region, Config, MFMTS_Work } from "../common/types";
 
 
 import * as Palette from "../common/palettes.js";
 
 
+let is_working = false;
+let stop_current_work = false;
+let arr: Uint8ClampedArray;
 
 
 function* edgePixels(region: Region): IterableIterator<[number, number]> {
@@ -90,7 +93,7 @@ function* pixelsRegion(cfg: Config, region: Region): IterableIterator<{ re: numb
 
 
 
-function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, boolean, boolean> {
+function* processMaker(inMsg: MFMTS_Work): Generator<boolean, boolean, boolean> {
 
   // Constants
   // const BAILOUT_RADIUS = 2147483647;
@@ -98,7 +101,7 @@ function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, bool
 
   const { cfg, region, part } = inMsg;
 
-  const arr = new Uint8ClampedArray(inMsg.imagePart.buffer);  // data
+  arr = new Uint8ClampedArray(inMsg.imagePart.buffer);  // data
 
 
   /** What is the max. iteration we're willing to tolerate. */
@@ -111,12 +114,6 @@ function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, bool
   const rgba = [0, 0, 0, 1.0];
 
   // Reset alpha channel of array
-  {
-    for (let i = 0; i < arr.length; i += 4) {
-      arr[i + 3] = 0;
-    }
-  }
-
 
   // Edge checking
   for (const [x, y] of edgePixels(region)) {
@@ -138,10 +135,19 @@ function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, bool
   // Color rest
 
 
+  // TODO: maybe put the count limit such that it's proportional to region
+  // size?
   let pixelCount = 0;
-  const pixelCountYield = 100;
+  const pixelCountYield = 2000;
 
   for (const { re: re0, im: im0, idx: idx4 } of pixelsRegion(cfg, region)) {
+
+    pixelCount += 1;
+
+    if (pixelCount % pixelCountYield === 0) {
+      yield true;
+    }
+
     let re = re0;
     let im = im0;
 
@@ -181,8 +187,6 @@ function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, bool
     let re_sq = re * re;
     /** im * im */
     let im_sq = im * im;
-
-    // TODO: maybe do periodicity checking
 
 
     let re_old = 0;
@@ -231,31 +235,23 @@ function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, bool
       iterations = iterations + 1 - nu;
     }
 
-    // iterations += 4;
-
     // NOTE: iterations may be negative.
-
     // assert(Number.isFinite(iterations));
 
 
-    
     Palette.softrainbow(escaped, iterations, rgba);
 
     arr[idx4 + 0] = clamp(Math.floor(256 * rgba[0]), 0, 255);
     arr[idx4 + 1] = clamp(Math.floor(256 * rgba[1]), 0, 255);
     arr[idx4 + 2] = clamp(Math.floor(256 * rgba[2]), 0, 255);
     arr[idx4 + 3] = clamp(Math.floor(256 * rgba[3]), 0, 255);
-
-
-    pixelCount += 1;
-
-    if (pixelCount % pixelCountYield === 0) {
-      yield true;
-    }
   }
 
 
   const outMsg: MessageFromSlaveToMaster = {
+    id: inMsg.cfg.id,
+
+    done: true,
     part: part,
     imgPart: arr.buffer,
     wi: inMsg.wi,
@@ -273,12 +269,57 @@ function* processMaker(inMsg: MessageFromMasterToSlave): Generator<boolean, bool
 };
 
 
+function doWork(inMsg: MFMTS_Work) {
+  const process = processMaker(inMsg);
+
+  is_working = true;
+
+  while (process.next().value) {
+    if (stop_current_work) {
+      break;
+    }
+  }
+
+  is_working = false;
+
+  if (stop_current_work) {
+    stop_current_work = false;
+
+    const { cfg, part } = inMsg;
+
+    const outMsg: MessageFromSlaveToMaster = {      
+      id: inMsg.cfg.id,
+
+      done: false,
+      part: part,
+      imgPart: arr.buffer,
+      wi: inMsg.wi,
+
+      re: cfg.re,
+      im: cfg.im,
+
+      z: cfg.z,
+    };
+
+    postMessage(outMsg, [outMsg.imgPart]);
+  }
+}
+
+function doStop() {
+  if (is_working) {
+    stop_current_work = true;
+  }
+}
+
+
 function messageHandler(e: MessageEvent): void {
   const inMsg: MessageFromMasterToSlave = e.data;
 
-  const process = processMaker(inMsg);
-
-  while (process.next().value) { }
+  if (inMsg.type === "work") {
+    doWork(inMsg);
+  } else if (inMsg.type === "stop") {
+    doStop();
+  }
 }
 
 onmessage = messageHandler;
