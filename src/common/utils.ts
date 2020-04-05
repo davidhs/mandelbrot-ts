@@ -231,6 +231,14 @@ export function hslToRgb(h: number, s: number, l: number): number[] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
+export function ditherToInt(f: number) {
+  const co = f;
+  const ci = Math.floor(co);
+  const cf = co - ci;
+  const c = ci + ((Math.random() < cf) ? 1 : 0);
+  return c;
+}
+
 /**
  * 
  * @param h 

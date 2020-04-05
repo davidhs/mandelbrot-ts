@@ -15,8 +15,6 @@ async function main() {
   }
   
   const app = new App(canvas);
-
-  app.makeAllAvailableWorkersWork();
 }
 
 main();

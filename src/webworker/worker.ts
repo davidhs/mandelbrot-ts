@@ -255,7 +255,7 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
   }
 
 
-  const outMsg: MessageFromSlaveToMaster = {
+  const output_message: MessageFromSlaveToMaster = {
     id: input_message.cfg.id,
 
     done: true,
@@ -270,7 +270,7 @@ function* processMaker(input_message: MFMTS_Work): Generator<boolean, boolean, b
   };
 
 
-  postMessage(outMsg, [outMsg.imgPart]);
+  postMessage(output_message, [output_message.imgPart]);
 
   return false;
 };
