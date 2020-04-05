@@ -1,9 +1,18 @@
-export function assert(condition: any, message = "Assertion failed!"): asserts condition {
+/**
+ * 
+ * @param condition 
+ * @param message 
+ */
+export function assert(condition: boolean, message = "Assertion failed!"): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
+/**
+ * 
+ * @param array 
+ */
 export function shuffle(array: any[]): void {
   let currentIndex = array.length;
   let temporaryValue;
@@ -164,9 +173,12 @@ export function getSSArray(
   };
 }
 
+/**
+ * 
+ * @param obj 
+ */
 export function getObjectSize(obj: any): number {
-  let key,
-    count = 0;
+  let key, count = 0;
   for (key in obj) {
     if (obj.hasOwnProperty(key)) {
       count++;
@@ -176,6 +188,12 @@ export function getObjectSize(obj: any): number {
   return count;
 }
 
+/**
+ * 
+ * @param p 
+ * @param q 
+ * @param t 
+ */
 export function hue2rgb(p: number, q: number, t: number): number {
   if (t < 0) t += 1;
   if (t > 1) t -= 1;
@@ -213,12 +231,14 @@ export function hslToRgb(h: number, s: number, l: number): number[] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-export function hslToRgbRW(
-  h: number,
-  s: number,
-  l: number,
-  arr: number[]
-): void {
+/**
+ * 
+ * @param h 
+ * @param s 
+ * @param l 
+ * @param arr 
+ */
+export function hslToRgbRW(h: number, s: number, l: number, arr: number[]): void {
   let r, g, b;
 
   if (s === 0) {
@@ -237,3 +257,55 @@ export function hslToRgbRW(
   arr[2] = Math.round(b * 255);
 }
 
+/**
+ * 
+ * @param v0 
+ * @param v1 
+ * @param t 
+ */
+export function lerp(v0: number, v1: number, t: number) {
+  return (1.0 - t) * v0 + t * v1;
+}
+
+/**
+ * 
+ * @param value 
+ * @param min 
+ * @param max 
+ */
+export function clamp(value: number, min: number, max: number) {
+  if (value < min) {
+    return min;
+  } else if (value > max) {
+    return max;
+  } else {
+    return value;
+  }
+}
+
+/**
+ * Fractual equivalence given tolerance
+ * 
+ * @param a 
+ * @param b 
+ * @param t 
+ */
+export function feq(a: number, b: number, t: number) {
+  let d = a - b;
+
+  if (d < 0) d = -d;
+
+  return d <= t;
+}
+
+/**
+ * 
+ * @param hex on the form `#aaaaaa`.
+ */
+export function hex2rgba(hex: string) {
+  const r = Number.parseInt(hex.substring(1, 3), 16);
+  const g = Number.parseInt(hex.substring(3, 5), 16);
+  const b = Number.parseInt(hex.substring(5, 7), 16);
+
+  return [r / 255, g / 255, b / 255, 1.0];
+};

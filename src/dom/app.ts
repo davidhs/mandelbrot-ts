@@ -1,12 +1,18 @@
+/// <reference lib="esnext" />
+/// <reference lib="dom" />
+
 import Qtree from "../common/qtree.js";
 import ImagePart from "../common/imagepart.js";
 import Mouse from "../common/mouse.js";
 
 import { assert, shuffle } from "../common/utils.js";
 
-import { Config, MessageFromMasterToSlave, MessageFromSlaveToMaster } from "../common/types";
+import { Config, MessageFromMasterToSlave, MessageFromSlaveToMaster, Region } from "../common/types";
 
 const WEB_WORKER_PATH = "js/webworker/worker.js";
+
+
+
 
 
 export default class App {
@@ -20,131 +26,90 @@ export default class App {
   private imageParts: Array<ImagePart>;
   private imageData: ImageData;
   private imageDataBuffer: ImageData;
-  private updated: boolean;
+
 
   private workersAvailability: Array<boolean>;
-  private timestamp: number;
   private mouse: Mouse;
 
   private canvasNeedsToUpdate: boolean;
 
   constructor(canvas: HTMLCanvasElement) {
-    // TypeScript, get off my back!
+
+
+    const ctx = canvas.getContext("2d");
+    assert(ctx !== null);
+    const workers: Worker[] = [];
+    const mouse = new Mouse();
+    const cfg: Config = {
+      cw: 0,
+      ch: 0,
+      re: -0.5,
+      im: +0.0,
+      z: 4,
+      max_iter: 15000,
+    };
+    const workerScriptPath = WEB_WORKER_PATH;
+    const qtree = new Qtree();
+    const defaultNumberOfWorkers = 8;
+    const imageParts: ImagePart[] = [];
+    const workersAvailability: boolean[] = [];
+    
+
+    
     this.canvas = canvas;
-    {
-      const ctx = this.canvas.getContext("2d");
-      assert(ctx !== null);
-      this.ctx = ctx;
-    }
-    this.workers = [];
-    this.workerScriptPath = WEB_WORKER_PATH;
-    this.defaultNumberOfWorkers = 8;
-    this.qtree = new Qtree();
-    this.imageParts = [];
+    this.ctx = ctx;
+    this.workers = workers;
+    this.workerScriptPath = workerScriptPath;
+    this.defaultNumberOfWorkers = defaultNumberOfWorkers;
+    this.qtree = qtree;
+    this.imageParts = imageParts;
     this.canvas.width = 0;
     this.canvas.height = 0;
-    this.imageDataBuffer = this.ctx.createImageData(
-      1,
-      1
-    );
+    this.imageDataBuffer = this.ctx.createImageData(1, 1);
     this.canvasNeedsToUpdate = true;
-    this.imageData = this.ctx.getImageData(
-      0,
-      0,
-      1,
-      1
-    );
-    this.updated = false;
-    this.workersAvailability = [];
-    this.timestamp = App.getTimestamp();
-    
-    this.mouse = new Mouse();
+    this.imageData = this.ctx.getImageData(0, 0, 1, 1);
+    this.workersAvailability = workersAvailability;
+    this.mouse = mouse;
+    this.cfg = cfg;
 
-    this.cfg = {
-      width: 0,
-      height: 0,
-      scene: {
-        theta: 0,
-        point: {
-          re: -0.5, // real value (x)
-          im: 0 // imaginary value (y)
-        },
-        zoom: 4, // lower value --> zoom in
-        rendering: {
-          threshold: 150_000,
+    cfg.cw = window.innerWidth;
+    cfg.ch = window.innerHeight;
 
-          // Supersampling
-          ss: {
-            hor: {
-              min: -0.5,
-              max: 0.5,
-              splits: 3 // I can do the splits, no problem!
-            },
-            ver: {
-              min: -0.5,
-              max: 0.5,
-              splits: 3
-            }
-          }
-        }
-      },
-      _precomputed: {
-        z0: -1,
-        sx0: -1,
-        sy0: -1,
-        cos: -1,
-        sin: -1,
-      }
-    };
+    qtree.splitSubTree(4); // 2x2 (4)
 
-    
-    this.updated = false;
+    let w = Math.ceil(cfg.cw);
+    let h = Math.ceil(cfg.ch);
 
-
-    this.timestamp = App.getTimestamp();
-    this.workers = [];
-    this.workersAvailability = [];
-    this.workerScriptPath = WEB_WORKER_PATH;
-    this.defaultNumberOfWorkers = 8;
-
-    this.qtree = new Qtree();
-
-    this.setWidth(window.innerWidth);
-    this.setHeight(window.innerHeight);
-
-    this.qtree.splitSubTree(4); // 2x2 (4)
-
-    let w = Math.ceil(this.getWidth());
-    let h = Math.ceil(this.getHeight());
-
-    this.imageParts = [];
-
-    for (let i = 0; i < this.defaultNumberOfWorkers; i += 1) {
+    for (let i = 0; i < defaultNumberOfWorkers; i += 1) {
       let imagePart = new ImagePart(w, h, 4);
-      this.imageParts.push(imagePart);
+      imageParts.push(imagePart);
     }
 
-    for (let i = 0; i < this.defaultNumberOfWorkers; i++) {
-      this.workers[i] = new Worker(this.workerScriptPath, { type: "module" });
-      this.workersAvailability.push(true);
+    for (let i = 0; i < defaultNumberOfWorkers; i++) {
+      workers[i] = new Worker(workerScriptPath, { type: "module" });
+      workersAvailability.push(true);
     }
 
-    let self = this;
+    canvas.width = cfg.cw;
+    canvas.height = cfg.ch;
 
-    window.addEventListener(
-      "resize",
-      function () {
-        self.resizeCanvas();
-      },
-      false
+    this.imageDataBuffer = ctx.createImageData(cfg.cw, cfg.ch);
+
+    this.imageData = ctx.getImageData(
+      0,
+      0,
+      cfg.cw,
+      cfg.ch
     );
 
 
-    this.canvas.addEventListener("mousedown", e => {
+    window.addEventListener("resize", () => { this.resizeCanvas() }, false);
+
+    canvas.addEventListener("mousedown", e => {
       this.mouse.consume(e);
     });
 
-    this.canvas.addEventListener("mousemove", e => {
+    canvas.addEventListener("mousemove", e => {
       this.mouse.consume(e);
 
       if (this.mouse.mbdr) {
@@ -159,44 +124,38 @@ export default class App {
         let ox = px;
         let oy = py;
 
-        let L = Math.min(this.cfg.width, this.cfg.height);
+        let L = Math.min(this.cfg.cw, this.cfg.ch);
         let z0 = 1 / L;
 
-        let z = this.cfg.scene.zoom;
+        let z = this.cfg.z;
 
         let sdx = ox - x;
         let sdy = oy - y;
 
-        let wx0 = this.cfg.scene.point.re;
-        let wy0 = this.cfg.scene.point.im;
+        let wx0 = this.cfg.re;
+        let wy0 = this.cfg.im;
 
         let wdx = +z * z0 * sdx;
         let wdy = -z * z0 * sdy;
 
-        let sin = 0;
-        let cos = 1;
+        let wx = wx0 + wdx;
+        let wy = wy0 + wdy;
 
-        let wrdx = cos * wdx - sin * wdy;
-        let wrdy = sin * wdx + cos * wdy;
-
-        let wx = wx0 + wrdx;
-        let wy = wy0 + wrdy;
-
-        this.cfg.scene.point.re = wx;
-        this.cfg.scene.point.im = wy;
+        this.cfg.re = wx;
+        this.cfg.im = wy;
       }
     });
 
-    this.canvas.addEventListener("mouseup", e => {
+    canvas.addEventListener("mouseup", (e) => {
       this.mouse.consume(e);
     });
 
-    this.canvas.addEventListener("wheel", (e: WheelEvent) => {
+    canvas.addEventListener("wheel", (e) => {
       this.mouse.consume(e);
 
       let dy = this.mouse.wdy;
 
-      let z = this.cfg.scene.zoom;
+      let z = this.cfg.z;
 
       let factor = 1;
 
@@ -214,27 +173,27 @@ export default class App {
 
       z *= factor;
 
-      this.cfg.scene.zoom = z;
+      this.cfg.z = z;
       this.refresh();
     });
 
-    this.canvas.addEventListener("dblclick", e => {
+    canvas.addEventListener("dblclick", (e) => {
       this.mouse.consume(e);
 
       let rect = this.canvas.getBoundingClientRect();
       let x = e.clientX - rect.left;
       let y = e.clientY - rect.top;
 
-      let L = Math.min(this.cfg.width, this.cfg.height);
+      let L = Math.min(this.cfg.cw, this.cfg.ch);
       let z0 = 1 / L;
 
-      let z = this.cfg.scene.zoom;
+      let z = this.cfg.z;
 
-      let sdx = x - this.cfg.width / 2;
-      let sdy = y - this.cfg.height / 2;
+      let sdx = x - this.cfg.cw / 2;
+      let sdy = y - this.cfg.ch / 2;
 
-      let wx0 = this.cfg.scene.point.re;
-      let wy0 = this.cfg.scene.point.im;
+      let wx0 = this.cfg.re;
+      let wy0 = this.cfg.im;
 
       let wdx = +z * z0 * sdx;
       let wdy = -z * z0 * sdy;
@@ -248,51 +207,18 @@ export default class App {
       let wx = wx0 + wrdx;
       let wy = wy0 + wrdy;
 
-      this.cfg.scene.point.re = wx;
-      this.cfg.scene.point.im = wy;
+      this.cfg.re = wx;
+      this.cfg.im = wy;
 
       this.refresh();
     });
-
-    this.canvas.width = this.getWidth();
-    this.canvas.height = this.getHeight();
-    // NOTE: this doesn't look super cool.
-    this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
-
-    this.imageDataBuffer = this.ctx.createImageData(
-      this.getWidth(),
-      this.getHeight()
-    );
-
-    this.imageData = this.ctx.getImageData(
-      0,
-      0,
-      this.getWidth(),
-      this.getHeight()
-    );
   }
 
-  private precomputeGlobalConfig() {
-    const cfg = this.cfg;
-
-    const { width, height, scene: { theta } } = cfg;
-
-    cfg._precomputed.z0 = 1.0 / Math.min(width, height);
-    cfg._precomputed.sx0 = width / 2.0;
-    cfg._precomputed.sy0 = height / 2.0;
-    cfg._precomputed.cos = Math.cos(theta);
-    cfg._precomputed.sin = Math.sin(theta);
-  }
-
-  private isUpdated() {
-    return this.updated;
-  }
-
-  private getRegion(code: string) {
+  private getRegion(code: string): Region {
     let x = 0;
     let y = 0;
-    let w = this.getWidth();
-    let h = this.getHeight();
+    let w = this.cfg.cw;
+    let h = this.cfg.ch;
 
     for (let i = 0; i < code.length; i += 1) {
       let c = code.charAt(i);
@@ -331,33 +257,6 @@ export default class App {
     };
   }
 
-  private setLatestTimestamp() {
-    this.timestamp = new Date().getTime();
-  }
-
-  private getLatestTimestamp() {
-    return this.timestamp;
-  }
-
-  private static getTimestamp() {
-    return new Date().getTime();
-  }
-
-  private getWidth() {
-    return this.cfg.width;
-  }
-
-  private getHeight() {
-    return this.cfg.height;
-  }
-
-  private setWidth(width: number) {
-    this.cfg.width = width;
-  }
-
-  private setHeight(height: number) {
-    this.cfg.height = height;
-  }
 
   /**
    * I guess any time you make any change, you need to call this function
@@ -367,13 +266,17 @@ export default class App {
     // TODO: handle resize (?)
 
     if (this.canvasNeedsToUpdate) {
-      const width = this.getWidth();
-      const height = this.getHeight();
+      const cw = this.cfg.cw;
+      const ch = this.cfg.ch;
 
-      this.canvas.width = width;
-      this.canvas.height = height;
+      this.canvas.width = cw;
+      this.canvas.height = ch;
 
-      this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+      const ctx = this.canvas.getContext("2d");
+
+      assert(ctx !== null);
+
+      this.ctx = ctx;
 
       this.canvasNeedsToUpdate = false;
 
@@ -381,25 +284,14 @@ export default class App {
         this.imageDataBuffer.data[i] = this.imageData.data[i];
       }
 
-      this.imageData = this.ctx.getImageData(0, 0, width, height );
-      this.imageData = this.ctx.getImageData(0, 0, width, height);
+      this.imageData = this.ctx.getImageData(0, 0, cw, ch);
+      this.imageData = this.ctx.getImageData(0, 0, cw, ch);
     }
-
-    this.setLatestTimestamp();
-    this.updated = true;
 
     // What we're going to do when we need to redraw the canvas
-    {
-      const CHOICE = 1;
-      if (CHOICE === 1) {
-        // Clear the canvas
-        this.ctx.putImageData(this.imageData, 0, 0);
-      } else if (CHOICE === 2) {
-        // Don't clear the canvas
-      }
-    }
+    this.ctx.putImageData(this.imageData, 0, 0);
 
-    
+
 
     this.qtree.forAllPreorder(self => { self.setFlag(false); });
 
@@ -411,8 +303,6 @@ export default class App {
   }
 
   public start() {
-    this.precomputeGlobalConfig();
-
     for (let i = 0; i < this.workers.length; i += 1) {
       this.requestJob(i);
     }
@@ -460,7 +350,7 @@ export default class App {
       this.scheduleJob(workerIndex, node);
     } else {
       // No more jobs for you
-      this.updated = false;
+
     }
   }
 
@@ -474,7 +364,7 @@ export default class App {
     // TODO: if the data is stale that is being received, maybe discard it
     // or move it??
 
-    const workerIndex = msg.workerIndex;
+    const workerIndex = msg.wi;
 
     // Mark worker as available.
     this.workersAvailability[workerIndex] = true;
@@ -485,49 +375,36 @@ export default class App {
     // Draw region onto canvas //
     /////////////////////////////
 
-    // Canvas
-    const c_re = this.cfg.scene.point.re;
-    const c_im = this.cfg.scene.point.im;
-    const c_zoom = this.cfg.scene.zoom;
-
-    // Region
-    const r_re = msg.re;
-    const r_im = msg.im;
-    const r_zoom = msg.zoom;
-
-
     // TODO: reposition and rescale region.
 
-    if (true || this.getLatestTimestamp() === msg.timestamp) {
-      /** Width of canvas. */
-      const w = this.getWidth();
-      /** How many color channels to iterate through. */
-      const channels = 4;
+    /** Width of canvas. */
+    const w = this.cfg.cw;
+    /** How many color channels to iterate through. */
+    const channels = 4;
 
-      const region = this.getRegion(msg.part);
+    const region = this.getRegion(msg.part);
 
 
-      for (let y = 0; y < region.h; y += 1) {
-        for (let x = 0; x < region.w; x += 1) {
-          const ic = x + region.x + (y + region.y) * w;
-          const id = x + y * region.w;
+    for (let y = 0; y < region.h; y += 1) {
+      for (let x = 0; x < region.w; x += 1) {
+        const ic = x + region.x + (y + region.y) * w;
+        const id = x + y * region.w;
 
-          // Multiply for all 4 color channels.
+        // Multiply for all 4 color channels.
 
-          /* Canvas index */
-          const _ic = 4 * ic;
-          /* Data (region) index */
-          const _id = 4 * id;
+        /* Canvas index */
+        const _ic = 4 * ic;
+        /* Data (region) index */
+        const _id = 4 * id;
 
-          for (let ch = 0; ch < channels; ch += 1) {
-            this.imageData.data[_ic + ch] = arr[_id + ch];
-          }
+        for (let ch = 0; ch < channels; ch += 1) {
+          this.imageData.data[_ic + ch] = arr[_id + ch];
         }
       }
-
-      // Paint
-      this.ctx.putImageData(this.imageData, 0, 0);
     }
+
+    // Paint
+    this.ctx.putImageData(this.imageData, 0, 0);
 
     this.imageParts[workerIndex].arr = arr;
     this.requestJob(workerIndex);
@@ -540,14 +417,13 @@ export default class App {
     const message: MessageFromMasterToSlave = {
       cfg: this.cfg,
       region: region,
-      workerIndex: workerIndex,
+      wi: workerIndex,
       part: node.getPath(),
       imagePart: {
         arr: imagePart.arr,
         buffer: imagePart.arr.buffer,
         data: imagePart.getAdditionalData()
       },
-      timestamp: this.getLatestTimestamp()
     };
 
     let transferList = [message.imagePart.buffer];
@@ -571,11 +447,10 @@ export default class App {
   }
 
   private resizeCanvas(): void {
-    this.setWidth(window.innerWidth);
-    this.setHeight(window.innerHeight);
-    this.updated = true;
+    this.cfg.cw = window.innerWidth;
+    this.cfg.ch = window.innerHeight;
+
     this.canvasNeedsToUpdate = true;
-    this.precomputeGlobalConfig();
     this.refresh();
   }
 }
