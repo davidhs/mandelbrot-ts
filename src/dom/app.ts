@@ -14,15 +14,22 @@ const WEB_WORKER_PATH = "js/webworker/worker.js";
 const DEFAULT_NUMBER_OF_WORKS = 8;
 
 
-/*
+/**
+ * Source: https://gist.github.com/ca0v/73a31f57b397606c9813472f7493a940
+ * 
+ * @param cb 
+ * @param wait 
+ */
+function debounce<T extends Function>(cb: T, wait: number) {
+  let h = 0;
+  
+  let callable = (...args: any) => {
+      clearTimeout(h);
+      h = setTimeout(() => cb(...args), wait);
+  };
 
-      this.#dw = dw;
-      this.#dh = dh;
-
-      this.#dx = dx;
-      this.#dy = dy;
-
-*/
+  return <T>(<any>callable);
+}
 
 
 export default class App {
@@ -49,6 +56,8 @@ export default class App {
   #dw: number;
   #dh: number;
 
+  private debouncedRefresh: any;
+
 
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
@@ -72,12 +81,10 @@ export default class App {
     const imageParts: ImagePart[] = [];
     const isWorkerAvailable: boolean[] = [];
 
-
     this.#dx = 0;
     this.#dy = 0;
     this.#dw = 0;
     this.#dh = 0;
-
 
     this.canvas = canvas;
     this.ctx = ctx;
@@ -271,6 +278,9 @@ export default class App {
       this.cfg.im = im_new;
 
       this.refresh();
+
+
+      e.preventDefault();
     });
 
     canvas.addEventListener("dblclick", (e) => {
@@ -286,6 +296,10 @@ export default class App {
 
       this.refresh();
     });
+
+    this.debouncedRefresh = debounce(() => {
+      this._doRefresh();
+    }, 1);
 
     this.refresh();
   }
@@ -398,21 +412,19 @@ export default class App {
     return { x, y, w, h };
   }
 
-
   /**
-   * I guess any time you make any change, you need to call this function
-   * to rerender.
+   * DO NOT CALL THIS FUNCTION
    */
-  private refresh() {
+  private _doRefresh() {
+    // Canvas width / height we want
+    const cw = this.cfg.cw;
+    const ch = this.cfg.ch;
+
     if (this.canvasNeedsToUpdate) {
       this.canvasNeedsToUpdate = false;
 
-      const cw = this.cfg.cw;
-      const ch = this.cfg.ch;
-
       this.canvas.width = cw;
       this.canvas.height = ch;
-
       
       // Is this OK?
       this.#dw = cw;
@@ -433,61 +445,29 @@ export default class App {
 
     // Move and scale the previous image
 
-    
-    const cw = this.cfg.cw;
-    const ch = this.cfg.ch;
-
-
-    if (false) {
-      // TODO: now this doesn't work correctly
-
-      const pan_x = this.mouse.cx - this.mouse.px;
-      const pan_y = this.mouse.cy - this.mouse.py;
-
-
-      const old_z = this.#old_z;
-      const new_z = this.#new_z;
-
-      const sx = 0;
-      const sy = 0;
-      const sw = cw;
-      const sh = ch;
-
-      const f = old_z / new_z; //new_z / old_z;
-
-      const dw = f * cw;
-      const dh = f * ch;
-
-      const dx = pan_x + (cw - dw) / 2;
-      const dy = pan_y + (ch - dh) / 2;
-
-      this.ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh);
-
-      // Eat the zoom change
-      this.#old_z = this.#new_z;
-    } else {
-      const sx = 0;
-      const sy = 0;
-      const sw = cw;
-      const sh = ch;
-
-      const dx = this.#dx;
-      const dy = this.#dy;
-      const dw = this.#dw;
-      const dh = this.#dh;
-
-      this.ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh);
-    }
-
-
-
+    this.ctx.drawImage(
+      this.canvas, 
+      0, 0, cw, ch, 
+      this.#dx, this.#dy, this.#dw, this.#dh
+    );
 
     this.imageData = this.ctx.getImageData(0, 0, cw, ch);
+    // this.ctx.putImageData(this.imageData, 0, 0);
 
     this.cfg.id = Date.now();
     this.stopCurrentWork();
     this.qtree.free();
     this.makeAllAvailableWorkersWork();
+  }
+
+
+  /**
+   * I guess any time you make any change, you need to call this function
+   * to rerender.
+   */
+  private refresh() {
+    // this.debouncedRefresh();
+    this._doRefresh();
   }
 
   public makeAllAvailableWorkersWork() {
