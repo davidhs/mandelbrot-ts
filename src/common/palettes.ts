@@ -119,6 +119,7 @@ export const softrainbow: PaletteFunction = (() => {
     }
 
     iterations = Math.log2(Math.abs(iterations));
+    iterations = iterations * 0.5;
 
     gradient.getColorAt(iterations, rgba);
   };
