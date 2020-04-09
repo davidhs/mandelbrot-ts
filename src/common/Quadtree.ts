@@ -7,4 +7,6 @@ export default class Quadtree {
     this.#parent = parent;
     this.#children = [];
   }
+
+  
 }
