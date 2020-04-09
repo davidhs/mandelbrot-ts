@@ -1,6 +1,8 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
+// Rename to `cartographer.js`
+
 import { clamp, feq } from "../common/utils.js";
 import { MessageFromMasterToSlave, MessageFromSlaveToMaster, Region, Config, MFMTS_Work } from "../common/types";
 import * as Palette from "../common/palettes.js";
